@@ -640,7 +640,82 @@ export async function sendEveningSummaryEmail(
     todayEnd.setHours(23, 59, 59, 999);
 
     const userWhere = targetUserId ? { id: targetUserId, isActive: true } : { isActive: true };
+    const isSaturday = todayStart.getDay() === 6;
+    const defaultEnd = isSaturday ? '1.30' : config?.shiftEndTime || '5.30';
 
+    if (targetUserId && customCheckOutTime && customCheckOutTime.trim()) {
+      const existing = await prisma.dailyShift.findFirst({
+        where: { userId: targetUserId, date: { gte: todayStart, lte: todayEnd } },
+      });
+      if (existing) {
+        await prisma.dailyShift.update({
+          where: { id: existing.id },
+          data: { shiftEndTime: customCheckOutTime.trim() },
+        });
+      } else {
+        await prisma.dailyShift.create({
+          data: {
+            userId: targetUserId,
+            date: todayStart,
+            shiftEndTime: customCheckOutTime.trim(),
+          },
+        });
+      }
+    }
+
+    // Auto-complete daily tasks by checkout time if not yet completed by the user
+    const targetUsersList = await prisma.user.findMany({
+      where: userWhere,
+      include: {
+        shifts: {
+          where: {
+            date: { gte: todayStart, lte: todayEnd },
+          },
+        },
+      },
+    });
+
+    for (const u of targetUsersList) {
+      const userShift = u.shifts[0] || null;
+      const finalShiftEnd =
+        (u.id === targetUserId && customCheckOutTime?.trim()) ||
+        userShift?.shiftEndTime ||
+        defaultEnd;
+
+      // Find all daily recurring tasks for today
+      const allDailyTasks = await prisma.task.findMany({
+        where: {
+          userId: u.id,
+          recurrence: 'DAILY',
+        },
+        include: { subtasks: true },
+      });
+
+      const shiftStartVal = userShift?.shiftStartTime || config?.shiftStartTime || '8.30';
+
+      for (const t of allDailyTasks) {
+        // Complete all subtasks if not yet done
+        if (t.subtasks && t.subtasks.length > 0) {
+          await prisma.subtask.updateMany({
+            where: { taskId: t.id },
+            data: { isDone: true },
+          });
+        }
+
+        // Complete daily task with 100% progress, start time from check-in, and checkout end time
+        await prisma.task.update({
+          where: { id: t.id },
+          data: {
+            status: 'DONE',
+            progress: 100,
+            startTime: t.startTime || shiftStartVal,
+            endTime: t.endTime || finalShiftEnd,
+          },
+        });
+      }
+    }
+
+    // Query updated users and tasks
     const users = await prisma.user.findMany({
       where: userWhere,
       include: {
@@ -679,29 +754,6 @@ export async function sendEveningSummaryEmail(
     }
 
     const primaryUser = users[0];
-
-    const isSaturday = todayStart.getDay() === 6;
-    const defaultEnd = isSaturday ? '1.30' : config?.shiftEndTime || '5.30';
-
-    if (targetUserId && customCheckOutTime && customCheckOutTime.trim()) {
-      const existing = await prisma.dailyShift.findFirst({
-        where: { userId: targetUserId, date: { gte: todayStart, lte: todayEnd } },
-      });
-      if (existing) {
-        await prisma.dailyShift.update({
-          where: { id: existing.id },
-          data: { shiftEndTime: customCheckOutTime.trim() },
-        });
-      } else {
-        await prisma.dailyShift.create({
-          data: {
-            userId: targetUserId,
-            date: todayStart,
-            shiftEndTime: customCheckOutTime.trim(),
-          },
-        });
-      }
-    }
 
     const transporter = await getTransporter();
 

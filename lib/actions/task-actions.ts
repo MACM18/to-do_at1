@@ -117,7 +117,7 @@ export async function createTask(formData: {
       recurrence: formData.recurrence || 'NONE',
       userId: formData.userId,
       dueDate: formData.dueDate ? new Date(formData.dueDate) : null,
-      startTime: formData.startTime?.trim() || null,
+      startTime: formData.startTime?.trim() || (formData.recurrence === 'DAILY' ? '8.30' : null),
       endTime: formData.endTime?.trim() || null,
       priority: formData.priority || 'High',
       assignedBy: formData.assignedBy?.trim() || 'Myself',
@@ -219,6 +219,40 @@ export async function updateTask(
   return task;
 }
 
+function getCurrentDotTime(): string {
+  const now = new Date();
+  const h = now.getHours();
+  const m = String(now.getMinutes()).padStart(2, '0');
+  return `${h}.${m}`;
+}
+
+export async function startTask(taskId: string) {
+  const task = await prisma.task.findUnique({ where: { id: taskId } });
+  if (!task) return null;
+
+  const updateData: any = {};
+  if (!task.startTime) {
+    if (task.recurrence === 'DAILY') {
+      const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
+      updateData.startTime = config?.shiftStartTime || '8.30';
+    } else {
+      updateData.startTime = getCurrentDotTime();
+    }
+  }
+
+  if (task.status === 'TODO') {
+    updateData.status = 'IN_PROGRESS';
+  }
+
+  const updated = await prisma.task.update({
+    where: { id: taskId },
+    data: updateData,
+  });
+
+  revalidatePath('/');
+  return updated;
+}
+
 export async function deleteTask(taskId: string) {
   await prisma.task.delete({
     where: { id: taskId },
@@ -227,7 +261,7 @@ export async function deleteTask(taskId: string) {
   return { success: true };
 }
 
-// Fast toggle for tasks without subtasks (0% <-> 100%)
+// Fast toggle for tasks (0% <-> 100%) with smart start/end timing
 export async function toggleTaskComplete(taskId: string, currentStatus: string) {
   const isDone = currentStatus === 'DONE';
   const task = await prisma.task.findUnique({
@@ -237,8 +271,22 @@ export async function toggleTaskComplete(taskId: string, currentStatus: string) 
 
   if (!task) return null;
 
+  const nextDone = !isDone;
+  const currentTime = getCurrentDotTime();
+
+  const taskUpdateData: any = {
+    status: nextDone ? 'DONE' : 'TODO',
+    progress: nextDone ? 100 : 0,
+  };
+
+  if (nextDone) {
+    if (!task.startTime) {
+      taskUpdateData.startTime = task.recurrence === 'DAILY' ? '8.30' : currentTime;
+    }
+    taskUpdateData.endTime = currentTime;
+  }
+
   if (task.subtasks.length > 0) {
-    const nextDone = !isDone;
     await prisma.$transaction([
       prisma.subtask.updateMany({
         where: { taskId },
@@ -246,19 +294,13 @@ export async function toggleTaskComplete(taskId: string, currentStatus: string) 
       }),
       prisma.task.update({
         where: { id: taskId },
-        data: {
-          status: nextDone ? 'DONE' : 'TODO',
-          progress: nextDone ? 100 : 0,
-        },
+        data: taskUpdateData,
       }),
     ]);
   } else {
     await prisma.task.update({
       where: { id: taskId },
-      data: {
-        status: isDone ? 'TODO' : 'DONE',
-        progress: isDone ? 0 : 100,
-      },
+      data: taskUpdateData,
     });
   }
 
@@ -266,12 +308,14 @@ export async function toggleTaskComplete(taskId: string, currentStatus: string) 
   return { success: true };
 }
 
-// Subtask toggle with weighted progress calculation
+// Subtask toggle with weighted progress calculation and smart start/end timing
 export async function toggleSubtask(subtaskId: string, taskId: string) {
   const subtask = await prisma.subtask.findUnique({ where: { id: subtaskId } });
   if (!subtask) return;
 
+  const parentTask = await prisma.task.findUnique({ where: { id: taskId } });
   const newDoneState = !subtask.isDone;
+  const currentTime = getCurrentDotTime();
 
   await prisma.subtask.update({
     where: { id: subtaskId },
@@ -285,12 +329,24 @@ export async function toggleSubtask(subtaskId: string, taskId: string) {
 
   const { progress, status } = calculateTaskProgress(updatedSubtasks);
 
+  const taskUpdateData: any = {
+    progress: progress,
+    status: status,
+  };
+
+  // If subtask started/toggled and parent task has no startTime, set it
+  if (parentTask && !parentTask.startTime) {
+    taskUpdateData.startTime = parentTask.recurrence === 'DAILY' ? '8.30' : currentTime;
+  }
+
+  // If task reaches 100% completion, record endTime
+  if (status === 'DONE' || progress === 100) {
+    taskUpdateData.endTime = currentTime;
+  }
+
   await prisma.task.update({
     where: { id: taskId },
-    data: {
-      progress: progress,
-      status: status,
-    },
+    data: taskUpdateData,
   });
 
   revalidatePath('/');

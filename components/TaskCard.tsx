@@ -18,10 +18,12 @@ import {
   CalendarDays,
   Zap,
   Flame,
+  Play,
 } from 'lucide-react';
 import {
   toggleTaskComplete,
   toggleSubtask,
+  startTask,
   addSubtask,
   deleteSubtask,
   deleteTask,
@@ -258,6 +260,13 @@ export default function TaskCard({
     });
   };
 
+  const handleStartTask = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    startTransition(async () => {
+      await startTask(task.id);
+    });
+  };
+
   const handleConfirmDelete = () => {
     startTransition(async () => {
       await deleteTask(task.id);
@@ -333,6 +342,13 @@ export default function TaskCard({
               </span>
 
               {renderDueDateBadge(task.dueDate, isDone)}
+
+              {(task.startTime || task.endTime) && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 font-mono shrink-0">
+                  <Clock className="w-2.5 h-2.5" />
+                  {task.startTime || '8.30'} - {task.endTime || 'Done'}
+                </span>
+              )}
 
               {priority && (
                 <span className="text-[10px] font-medium text-slate-400 shrink-0">
@@ -468,14 +484,25 @@ export default function TaskCard({
                   {/* Creative Due Date Remaining Days Badge */}
                   {renderDueDateBadge(task.dueDate, isDone)}
 
-                  {/* Timing */}
-                  {(task.startTime || task.endTime) && (
+                  {/* Timing or Quick Start Action */}
+                  {task.startTime || task.endTime ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                       <Clock className="w-3 h-3 text-blue-500" />
                       {task.startTime ? task.startTime : 'Start'}
                       {task.endTime ? ` - ${task.endTime}` : ''}
                     </span>
-                  )}
+                  ) : !isDone ? (
+                    <button
+                      type="button"
+                      onClick={handleStartTask}
+                      disabled={isPending}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                      title="Click to record start time and mark in progress"
+                    >
+                      <Play className="w-2.5 h-2.5 fill-current text-blue-600 dark:text-blue-400" />
+                      <span>Start</span>
+                    </button>
+                  ) : null}
 
                   {/* Priority */}
                   <span
