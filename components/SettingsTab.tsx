@@ -20,6 +20,9 @@ import {
   Sparkles,
   Calendar,
   Zap,
+  Lock,
+  KeyRound,
+  ShieldAlert,
 } from 'lucide-react';
 import UserModal from './UserModal';
 import ConfirmDialog from './ConfirmDialog';
@@ -30,7 +33,7 @@ import {
   triggerMorningReportAction,
   triggerEveningSummaryAction,
 } from '@/lib/actions/config-actions';
-import { deleteUser } from '@/lib/actions/user-actions';
+import { deleteUser, updateUserPassword } from '@/lib/actions/user-actions';
 
 interface SettingsTabProps {
   config: any;
@@ -65,7 +68,7 @@ export default function SettingsTab({
     initialConfig?.morningReportTime || '08:00'
   );
   const [eveningReportTime, setEveningReportTime] = useState(
-    initialConfig?.eveningReportTime || '18:00'
+    initialConfig?.eveningReportTime || '17:30'
   );
   const [shiftStartTime, setShiftStartTime] = useState(
     initialConfig?.shiftStartTime || '8.30'
@@ -75,9 +78,6 @@ export default function SettingsTab({
   );
   const [shiftEndTime, setShiftEndTime] = useState(
     initialConfig?.shiftEndTime || '5.30'
-  );
-  const [autoSendMorningReport, setAutoSendMorningReport] = useState(
-    Boolean(initialConfig?.autoSendMorningReport)
   );
   const [autoSendDailyLog, setAutoSendDailyLog] = useState(
     Boolean(initialConfig?.autoSendDailyLog)
@@ -89,12 +89,24 @@ export default function SettingsTab({
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
+
+  // Password Management State
+  const [selectedPasswordUserId, setSelectedPasswordUserId] = useState<string>(
+    users[0]?.id || ''
+  );
+  const [newTargetPassword, setNewTargetPassword] = useState('');
+  const [confirmTargetPassword, setConfirmTargetPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [isPasswordConfirmOpen, setIsPasswordConfirmOpen] = useState(false);
+
   const [statusMessage, setStatusMessage] = useState<{
     type: 'success' | 'error';
     text: string;
   } | null>(null);
 
   const [isPending, startTransition] = useTransition();
+
+  const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'LEAD';
 
   // Save Config
   const handleSaveConfig = (e: React.FormEvent) => {
@@ -119,7 +131,6 @@ export default function SettingsTab({
           shiftStartTime,
           prepEndTime,
           shiftEndTime,
-          autoSendMorningReport,
           autoSendDailyLog,
         });
         setConfig(updated);
@@ -217,6 +228,43 @@ export default function SettingsTab({
       }
     });
   };
+
+  // Trigger Password Change Request
+  const handleRequestPasswordChange = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPasswordUserId) {
+      setStatusMessage({ type: 'error', text: 'Please select a team member.' });
+      return;
+    }
+    if (!newTargetPassword || newTargetPassword.length < 4) {
+      setStatusMessage({ type: 'error', text: 'Password must be at least 4 characters.' });
+      return;
+    }
+    if (newTargetPassword !== confirmTargetPassword) {
+      setStatusMessage({ type: 'error', text: 'Passwords do not match. Please re-type.' });
+      return;
+    }
+
+    setIsPasswordConfirmOpen(true);
+  };
+
+  // Execute Password Change on Confirmation
+  const handleExecutePasswordChange = () => {
+    startTransition(async () => {
+      try {
+        const res = await updateUserPassword(selectedPasswordUserId, newTargetPassword);
+        setIsPasswordConfirmOpen(false);
+        setNewTargetPassword('');
+        setConfirmTargetPassword('');
+        setStatusMessage({ type: 'success', text: res.message });
+      } catch (err: any) {
+        setIsPasswordConfirmOpen(false);
+        setStatusMessage({ type: 'error', text: err.message });
+      }
+    });
+  };
+
+  const targetPasswordUser = users.find((u) => u.id === selectedPasswordUserId);
 
   return (
     <div className="space-y-6 pb-28 max-w-7xl mx-auto">
@@ -568,7 +616,7 @@ export default function SettingsTab({
                   <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                     Team & Employee Management
                   </h2>
-                  <p className="text-xs text-slate-500">Manage user accounts and roles</p>
+                  <p className="text-xs text-slate-500">Manage user accounts, roles and status</p>
                 </div>
               </div>
 
@@ -599,7 +647,7 @@ export default function SettingsTab({
                         <span className="font-bold text-slate-900 dark:text-slate-100">{u.name}</span>
                         <span
                           className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                            u.role === 'LEAD'
+                            u.role === 'ADMIN' || u.role === 'LEAD'
                               ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
                               : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300'
                           }`}
@@ -642,6 +690,94 @@ export default function SettingsTab({
               ))}
             </div>
           </div>
+
+          {/* 3. Admin Security & User Password Reset Section (with Confirmation) */}
+          {isAdmin && (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
+              <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    Team Member Password Management
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Administrator tool to update and reset passwords for team members
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleRequestPasswordChange} className="space-y-4 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Select Team Member
+                    </label>
+                    <select
+                      value={selectedPasswordUserId}
+                      onChange={(e) => setSelectedPasswordUserId(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+                    >
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.role})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      New Password *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showNewPassword ? 'text' : 'password'}
+                        required
+                        value={newTargetPassword}
+                        onChange={(e) => setNewTargetPassword(e.target.value)}
+                        placeholder="Min 4 characters"
+                        className="w-full pl-3 pr-8 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showNewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Confirm Password *
+                    </label>
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      required
+                      value={confirmTargetPassword}
+                      onChange={(e) => setConfirmTargetPassword(e.target.value)}
+                      placeholder="Repeat password"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="submit"
+                    disabled={isPending || !newTargetPassword || !confirmTargetPassword}
+                    className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-bold transition-all shadow-sm active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Change User Password</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
 
         {/* Right Column: Fast Testing & Manual Force Triggers Sidebar (4 Cols on Desktop) */}
@@ -742,6 +878,19 @@ export default function SettingsTab({
         isLoading={isPending}
         onConfirm={handleConfirmDeleteUser}
         onCancel={() => setUserToDelete(null)}
+      />
+
+      {/* Confirm Password Change Dialog */}
+      <ConfirmDialog
+        isOpen={isPasswordConfirmOpen}
+        title="Confirm Password Change"
+        message={`Are you sure you want to update the login password for ${
+          targetPasswordUser?.name || 'this team member'
+        }? They will immediately need to use this new password to sign in.`}
+        confirmText="Update Password"
+        isLoading={isPending}
+        onConfirm={handleExecutePasswordChange}
+        onCancel={() => setIsPasswordConfirmOpen(false)}
       />
     </div>
   );

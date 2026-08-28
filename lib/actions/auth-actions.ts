@@ -30,18 +30,18 @@ export async function ensureMainUser() {
         name: envName,
         email: envEmail,
         password: envPassword,
-        role: 'LEAD',
+        role: 'ADMIN',
         isActive: true,
       },
     });
   } else {
-    // Keep credentials and lead role synced
-    if (user.role !== 'LEAD' || user.password !== envPassword || user.name !== envName) {
+    // Keep credentials and admin role synced
+    if (user.role !== 'ADMIN' || user.password !== envPassword || user.name !== envName) {
       user = await prisma.user.update({
         where: { id: user.id },
         data: {
           name: envName,
-          role: 'LEAD',
+          role: 'ADMIN',
           password: envPassword,
         },
       });

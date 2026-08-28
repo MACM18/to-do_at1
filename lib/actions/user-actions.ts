@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '../prisma';
-import { ensureMainUser } from './auth-actions';
+import { ensureMainUser, getCurrentUserSession } from './auth-actions';
 
 export async function getUsers() {
   await ensureMainUser();
@@ -78,6 +78,30 @@ export async function updateUser(
 
   revalidatePath('/');
   return user;
+}
+
+/**
+ * Admin action to change a user's password with verification
+ */
+export async function updateUserPassword(targetUserId: string, newPassword: string) {
+  const sessionUser = await getCurrentUserSession();
+  if (!sessionUser || (sessionUser.role !== 'ADMIN' && sessionUser.role !== 'LEAD')) {
+    throw new Error('Only administrators can change team member passwords.');
+  }
+
+  if (!newPassword || newPassword.trim().length < 4) {
+    throw new Error('Password must be at least 4 characters long.');
+  }
+
+  const user = await prisma.user.update({
+    where: { id: targetUserId },
+    data: {
+      password: newPassword.trim(),
+    },
+  });
+
+  revalidatePath('/');
+  return { success: true, message: `Password for ${user.name} successfully updated.` };
 }
 
 export async function deleteUser(userId: string) {
