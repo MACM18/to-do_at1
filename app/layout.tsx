@@ -1,4 +1,5 @@
 import { Metadata, Viewport } from 'next';
+import './globals.css';
 
 export const viewport: Viewport = {
   themeColor: '#0f172a',
@@ -31,7 +32,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full bg-slate-50 dark:bg-slate-950">
       <head>
-        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="apple-touch-icon" href="/icon-192.svg" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
