@@ -13,6 +13,7 @@ import {
   Repeat,
   AlertCircle,
   Calendar,
+  User,
 } from 'lucide-react';
 import {
   toggleTaskComplete,
@@ -39,6 +40,10 @@ interface Task {
   progress: number;
   dueDate: Date | string | null;
   recurrence: string;
+  startTime?: string | null;
+  endTime?: string | null;
+  priority?: string;
+  assignedBy?: string;
   userId: string;
   createdAt: Date | string;
   subtasks: Subtask[];
@@ -71,11 +76,13 @@ export default function TaskCard({
   const hasSubtasks = task.subtasks && task.subtasks.length > 0;
   const completedSubtasks = task.subtasks?.filter((s) => s.isDone).length || 0;
 
+  const priority = task.priority || 'High';
+  const assignedBy = task.assignedBy || 'Myself';
+
   const handleMainToggle = () => {
     startTransition(async () => {
       await toggleTaskComplete(task.id, task.status);
       if (!isDone) {
-        // Fire celebration confetti if turning done
         try {
           confetti({
             particleCount: 40,
@@ -83,7 +90,7 @@ export default function TaskCard({
             origin: { y: 0.8 },
           });
         } catch {
-          // ignore if unavailable
+          // ignore
         }
       }
     });
@@ -156,27 +163,61 @@ export default function TaskCard({
             )}
           </button>
 
-          {/* Main Title & Metadata */}
+          {/* Main Content */}
           <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5 mb-1">
+            {/* Metadata Tags */}
+            <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+              {/* Timing */}
+              {(task.startTime || task.endTime) && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                  <Clock className="w-3 h-3 text-blue-500" />
+                  {task.startTime ? task.startTime : 'Start'}
+                  {task.endTime ? ` - ${task.endTime}` : ''}
+                </span>
+              )}
+
+              {/* Priority */}
+              <span
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                  priority.toLowerCase() === 'high'
+                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                    : priority.toLowerCase() === 'medium'
+                    ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300'
+                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                }`}
+              >
+                {priority} Priority
+              </span>
+
+              {/* Assigned By */}
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                  assignedBy.toLowerCase() === 'myself'
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                    : 'bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300'
+                }`}
+              >
+                <User className="w-2.5 h-2.5" />
+                {assignedBy}
+              </span>
+
+              {/* Carry Over Badge */}
               {isCarryOver && !isDone && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
                   <AlertCircle className="w-3 h-3" /> Backlog
                 </span>
               )}
+
+              {/* Recurrence */}
               {task.recurrence !== 'NONE' && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
                   <Repeat className="w-3 h-3" /> {task.recurrence}
                 </span>
               )}
+
               {showAssignee && task.user && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
                   👤 {task.user.name}
-                </span>
-              )}
-              {task.dueDate && (
-                <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-                  <Calendar className="w-3 h-3" /> {formatDate(task.dueDate)}
                 </span>
               )}
             </div>
@@ -203,7 +244,7 @@ export default function TaskCard({
               </p>
             )}
 
-            {/* Progress Bar & Subtask Indicator */}
+            {/* Progress Bar & Productivity Metric */}
             <div className="mt-3 flex items-center gap-3">
               <div className="flex-1 bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
                 <div
@@ -218,8 +259,8 @@ export default function TaskCard({
                 />
               </div>
 
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 shrink-0 min-w-[36px] text-right">
-                {task.progress}%
+              <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 shrink-0 min-w-[48px] text-right">
+                {task.progress.toFixed(2)}%
               </span>
 
               {hasSubtasks && (
@@ -249,7 +290,7 @@ export default function TaskCard({
             </div>
           </div>
 
-          {/* Quick Actions Dropdown / Menu */}
+          {/* Quick Actions */}
           <div className="flex items-center gap-1 shrink-0">
             {onEdit && (
               <button
@@ -271,7 +312,7 @@ export default function TaskCard({
           </div>
         </div>
 
-        {/* Expandable Subtasks Section */}
+        {/* Expandable Subtasks */}
         {expanded && (
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
             <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
@@ -314,7 +355,7 @@ export default function TaskCard({
               </div>
             ))}
 
-            {/* Inline Add Subtask Input */}
+            {/* Inline Add Subtask */}
             <form onSubmit={handleAddSubtask} className="flex items-center gap-2 pt-1">
               <input
                 type="text"

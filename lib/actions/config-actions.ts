@@ -28,6 +28,9 @@ export async function getConfig() {
         emailRecipients: '',
         morningReportTime: '08:00',
         eveningReportTime: '18:00',
+        shiftStartTime: '8.30',
+        prepEndTime: '8.45',
+        shiftEndTime: '5.30',
         autoSendMorningReport: false,
         autoSendDailyLog: false,
       },
@@ -47,6 +50,9 @@ export async function updateConfig(data: {
   emailRecipients?: string;
   morningReportTime?: string;
   eveningReportTime?: string;
+  shiftStartTime?: string;
+  prepEndTime?: string;
+  shiftEndTime?: string;
   autoSendMorningReport?: boolean;
   autoSendDailyLog?: boolean;
   defaultUserId?: string;
@@ -67,6 +73,12 @@ export async function updateConfig(data: {
     updatePayload.morningReportTime = data.morningReportTime.trim();
   if (data.eveningReportTime !== undefined)
     updatePayload.eveningReportTime = data.eveningReportTime.trim();
+  if (data.shiftStartTime !== undefined)
+    updatePayload.shiftStartTime = data.shiftStartTime.trim();
+  if (data.prepEndTime !== undefined)
+    updatePayload.prepEndTime = data.prepEndTime.trim();
+  if (data.shiftEndTime !== undefined)
+    updatePayload.shiftEndTime = data.shiftEndTime.trim();
   if (data.autoSendMorningReport !== undefined)
     updatePayload.autoSendMorningReport = Boolean(data.autoSendMorningReport);
   if (data.autoSendDailyLog !== undefined)
@@ -82,7 +94,7 @@ export async function updateConfig(data: {
     },
   });
 
-  // Re-sync background scheduler with new times & options
+  // Re-sync background scheduler
   await initScheduler();
 
   revalidatePath('/');
@@ -107,6 +119,6 @@ export async function triggerMorningReportAction(userId?: string, recipientOverr
   return sendMorningTodoList(userId, recipientOverride);
 }
 
-export async function triggerEveningSummaryAction(recipientOverride?: string) {
-  return sendDailySummaryReport(recipientOverride);
+export async function triggerEveningSummaryAction(recipientOverride?: string, userId?: string) {
+  return sendDailySummaryReport(recipientOverride, userId);
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
-import { X, Plus, Trash2, Calendar, Repeat, User, Sparkles } from 'lucide-react';
+import { X, Plus, Trash2, Calendar, Repeat, User, Sparkles, Clock, AlertTriangle } from 'lucide-react';
 import { createTask, updateTask } from '@/lib/actions/task-actions';
 
 interface UserOption {
@@ -31,6 +31,10 @@ export default function TaskModal({
   const [recurrence, setRecurrence] = useState('NONE');
   const [userId, setUserId] = useState(currentUserId);
   const [dueDate, setDueDate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [priority, setPriority] = useState('High');
+  const [assignedBy, setAssignedBy] = useState('Myself');
   const [subtasks, setSubtasks] = useState<string[]>([]);
   const [subtaskInput, setSubtaskInput] = useState('');
   const [isPending, startTransition] = useTransition();
@@ -46,6 +50,10 @@ export default function TaskModal({
           ? new Date(editingTask.dueDate).toISOString().split('T')[0]
           : ''
       );
+      setStartTime(editingTask.startTime || '');
+      setEndTime(editingTask.endTime || '');
+      setPriority(editingTask.priority || 'High');
+      setAssignedBy(editingTask.assignedBy || 'Myself');
       setSubtasks(editingTask.subtasks ? editingTask.subtasks.map((s: any) => s.title) : []);
     } else {
       setTitle('');
@@ -53,6 +61,10 @@ export default function TaskModal({
       setRecurrence('NONE');
       setUserId(currentUserId);
       setDueDate('');
+      setStartTime('');
+      setEndTime('');
+      setPriority('High');
+      setAssignedBy('Myself');
       setSubtasks([]);
     }
   }, [editingTask, currentUserId, isOpen]);
@@ -80,6 +92,10 @@ export default function TaskModal({
           description,
           recurrence,
           dueDate: dueDate || null,
+          startTime: startTime || null,
+          endTime: endTime || null,
+          priority,
+          assignedBy,
         });
       } else {
         await createTask({
@@ -88,6 +104,10 @@ export default function TaskModal({
           recurrence,
           userId,
           dueDate: dueDate || null,
+          startTime: startTime || null,
+          endTime: endTime || null,
+          priority,
+          assignedBy,
           subtaskTitles: subtasks,
         });
       }
@@ -109,7 +129,7 @@ export default function TaskModal({
                 {editingTask ? 'Edit Task' : 'Create New Task'}
               </h2>
               <p className="text-xs text-slate-500">
-                {editingTask ? 'Update task details and schedule' : 'Add a task to your daily list or team'}
+                {editingTask ? 'Update task details and report metadata' : 'Add task with report time, priority & assignment'}
               </p>
             </div>
           </div>
@@ -126,38 +146,86 @@ export default function TaskModal({
           {/* Title */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Task Title *
+              Task Title / Description *
             </label>
             <input
               type="text"
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., Update Auth API & deploy to staging"
+              placeholder="e.g., Check the sales details and give an update"
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
-          {/* Description */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Description & Notes (Optional)
-            </label>
-            <textarea
-              rows={2}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add extra context, links, or requirements..."
-              className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+          {/* Start Time & End Time (for Evening Task Log) */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-blue-500" /> Start Time (Evening Log)
+              </label>
+              <input
+                type="text"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                placeholder="e.g., 8.45 or 9.00"
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-indigo-500" /> End Time (Evening Log)
+              </label>
+              <input
+                type="text"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                placeholder="e.g., 9.00 or 5.30"
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Priority & Assigned By Grid */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Priority */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> Priority Level
+              </label>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="High">High (Red)</option>
+                <option value="Medium">Medium (Blue)</option>
+                <option value="Low">Low (Grey)</option>
+              </select>
+            </div>
+
+            {/* Assigned By */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                <User className="w-3.5 h-3.5 text-emerald-500" /> Assigned By
+              </label>
+              <input
+                type="text"
+                value={assignedBy}
+                onChange={(e) => setAssignedBy(e.target.value)}
+                placeholder="e.g. Myself, Altitude1, Nimesh"
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
 
           {/* Assignee & Recurrence Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Assignee */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Assignee User */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                <User className="w-3.5 h-3.5" /> Assign To
+                <User className="w-3.5 h-3.5" /> Team Member
               </label>
               <select
                 disabled={Boolean(editingTask)}
@@ -183,31 +251,18 @@ export default function TaskModal({
                 onChange={(e) => setRecurrence(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="NONE">No Recurrence (One-off)</option>
+                <option value="NONE">No Recurrence</option>
                 <option value="DAILY">Daily (Renews every day)</option>
                 <option value="WEEKLY">Weekly (Renews weekly)</option>
               </select>
             </div>
           </div>
 
-          {/* Due Date */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5" /> Target / Due Date
-            </label>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
           {/* Subtasks (when creating new task) */}
           {!editingTask && (
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Subtasks (Break down complex tasks)
+                Subtasks (Auto-calculates weighted productivity %)
               </label>
               <div className="space-y-2 mb-2">
                 {subtasks.map((st, idx) => (

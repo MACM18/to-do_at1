@@ -29,6 +29,10 @@ export async function createTask(formData: {
   recurrence?: string;
   userId: string;
   dueDate?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  priority?: string;
+  assignedBy?: string;
   subtaskTitles?: string[];
 }) {
   if (!formData.title?.trim()) {
@@ -52,6 +56,10 @@ export async function createTask(formData: {
       recurrence: formData.recurrence || 'NONE',
       userId: formData.userId,
       dueDate: formData.dueDate ? new Date(formData.dueDate) : null,
+      startTime: formData.startTime?.trim() || null,
+      endTime: formData.endTime?.trim() || null,
+      priority: formData.priority || 'High',
+      assignedBy: formData.assignedBy?.trim() || 'Myself',
       status: 'TODO',
       progress: 0,
       subtasks: {
@@ -76,6 +84,10 @@ export async function updateTask(
     status?: string;
     progress?: number;
     dueDate?: string | null;
+    startTime?: string | null;
+    endTime?: string | null;
+    priority?: string;
+    assignedBy?: string;
   }
 ) {
   const updatePayload: any = {};
@@ -86,6 +98,10 @@ export async function updateTask(
   if (data.progress !== undefined) updatePayload.progress = data.progress;
   if (data.dueDate !== undefined)
     updatePayload.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+  if (data.startTime !== undefined) updatePayload.startTime = data.startTime?.trim() || null;
+  if (data.endTime !== undefined) updatePayload.endTime = data.endTime?.trim() || null;
+  if (data.priority !== undefined) updatePayload.priority = data.priority;
+  if (data.assignedBy !== undefined) updatePayload.assignedBy = data.assignedBy?.trim() || 'Myself';
 
   const task = await prisma.task.update({
     where: { id: taskId },
@@ -116,7 +132,6 @@ export async function toggleTaskComplete(taskId: string, currentStatus: string) 
   if (!task) return null;
 
   if (task.subtasks.length > 0) {
-    // If it has subtasks, mark all subtasks done or not done
     const nextDone = !isDone;
     await prisma.$transaction([
       prisma.subtask.updateMany({
@@ -190,7 +205,6 @@ export async function addSubtask(taskId: string, title: string) {
     },
   });
 
-  // Recalculate main task progress
   const allSubtasks = await prisma.subtask.findMany({ where: { taskId } });
   const completedCount = allSubtasks.filter((s) => s.isDone).length;
   const total = allSubtasks.length;

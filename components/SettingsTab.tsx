@@ -18,7 +18,7 @@ import {
   Loader2,
   HelpCircle,
   Sparkles,
-  Repeat,
+  Calendar,
 } from 'lucide-react';
 import UserModal from './UserModal';
 import {
@@ -29,7 +29,6 @@ import {
   triggerEveningSummaryAction,
 } from '@/lib/actions/config-actions';
 import { deleteUser } from '@/lib/actions/user-actions';
-import { processRecurringTasks } from '@/lib/recurrence';
 
 interface SettingsTabProps {
   config: any;
@@ -59,6 +58,15 @@ export default function SettingsTab({
   );
   const [eveningReportTime, setEveningReportTime] = useState(
     initialConfig?.eveningReportTime || '18:00'
+  );
+  const [shiftStartTime, setShiftStartTime] = useState(
+    initialConfig?.shiftStartTime || '8.30'
+  );
+  const [prepEndTime, setPrepEndTime] = useState(
+    initialConfig?.prepEndTime || '8.45'
+  );
+  const [shiftEndTime, setShiftEndTime] = useState(
+    initialConfig?.shiftEndTime || '5.30'
   );
   const [autoSendMorningReport, setAutoSendMorningReport] = useState(
     Boolean(initialConfig?.autoSendMorningReport)
@@ -96,13 +104,16 @@ export default function SettingsTab({
           emailRecipients,
           morningReportTime,
           eveningReportTime,
+          shiftStartTime,
+          prepEndTime,
+          shiftEndTime,
           autoSendMorningReport,
           autoSendDailyLog,
         });
         setConfig(updated);
         setStatusMessage({
           type: 'success',
-          text: 'Settings and cron schedules updated successfully!',
+          text: 'Settings, shift timing & schedules updated successfully!',
         });
       } catch (err: any) {
         setStatusMessage({
@@ -171,7 +182,7 @@ export default function SettingsTab({
   const handleForceEveningSummary = () => {
     setStatusMessage(null);
     startTransition(async () => {
-      const res = await triggerEveningSummaryAction();
+      const res = await triggerEveningSummaryAction(undefined, currentUser.id);
       if (res.success) {
         setStatusMessage({ type: 'success', text: res.message });
       } else {
@@ -207,7 +218,7 @@ export default function SettingsTab({
               App Settings & Automation Hub
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">
-              Manage Gmail SMTP, recipient dispatch list, scheduled triggers, and team members
+              Configure Gmail SMTP, shift report hours, recipient emails, and team members
             </p>
           </div>
         </div>
@@ -345,7 +356,7 @@ export default function SettingsTab({
           </button>
         </div>
 
-        {/* Gmail App Password Helper Drawer */}
+        {/* Gmail App Password Helper */}
         {showHelp && (
           <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 text-xs text-blue-900 dark:text-blue-200 space-y-2">
             <h4 className="font-bold flex items-center gap-1.5">
@@ -354,8 +365,8 @@ export default function SettingsTab({
             <ol className="list-decimal list-inside space-y-1 text-slate-700 dark:text-slate-300">
               <li>Open your Google Account: <a href="https://myaccount.google.com/security" target="_blank" rel="noreferrer" className="text-blue-600 font-bold underline">Security Settings</a>.</li>
               <li>Ensure <strong>2-Step Verification</strong> is enabled.</li>
-              <li>Search for or go to <strong>App Passwords</strong> (<a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" className="text-blue-600 font-bold underline">myaccount.google.com/apppasswords</a>).</li>
-              <li>Create a new App Name (e.g. &quot;Daily Task PWA&quot;) and copy the generated 16-character password into the field below.</li>
+              <li>Go to <strong>App Passwords</strong> (<a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" className="text-blue-600 font-bold underline">myaccount.google.com/apppasswords</a>).</li>
+              <li>Generate a 16-character password and paste below.</li>
             </ol>
           </div>
         )}
@@ -471,6 +482,59 @@ export default function SettingsTab({
           </div>
         </div>
 
+        {/* 3. Shift Timing Configuration */}
+        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+              Report Shift Timings (Shown in Table Rows)
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Shift Start (e.g. 8.30)
+              </label>
+              <input
+                type="text"
+                value={shiftStartTime}
+                onChange={(e) => setShiftStartTime(e.target.value)}
+                placeholder="8.30"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Plan Prep End (e.g. 8.45)
+              </label>
+              <input
+                type="text"
+                value={prepEndTime}
+                onChange={(e) => setPrepEndTime(e.target.value)}
+                placeholder="8.45"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Shift End (e.g. 5.30)
+              </label>
+              <input
+                type="text"
+                value={shiftEndTime}
+                onChange={(e) => setShiftEndTime(e.target.value)}
+                placeholder="5.30"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100"
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Testing Buttons */}
         <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -503,14 +567,14 @@ export default function SettingsTab({
           </div>
         </div>
 
-        {/* 3. Automation Schedule Pickers */}
+        {/* 4. Automation Schedule Pickers */}
         <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
               <Clock className="w-4 h-4" />
             </div>
             <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-              Scheduled Report Times & Automation
+              Automated Dispatch Times (HH:MM)
             </h3>
           </div>
 
@@ -519,7 +583,7 @@ export default function SettingsTab({
             <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  ☀️ Morning To-Do List
+                  ☀️ Morning Day Plan (No times)
                 </span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -549,7 +613,7 @@ export default function SettingsTab({
             <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  🌙 Evening Team Summary
+                  🌙 Evening Task Log (With times)
                 </span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -590,7 +654,7 @@ export default function SettingsTab({
         </div>
       </form>
 
-      {/* 4. Manual Instant Force Trigger Panel */}
+      {/* 5. Manual Instant Force Trigger Panel */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
         <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
           <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
@@ -612,10 +676,10 @@ export default function SettingsTab({
             className="p-4 rounded-2xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 border border-amber-200 dark:border-amber-900/50 text-left transition-all active:scale-98 disabled:opacity-50"
           >
             <div className="text-xs font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
-              <span>☀️</span> Force Send Morning To-Do List
+              <span>☀️</span> Force Send &quot;Day Plan&quot; Email
             </div>
             <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-1">
-              Dispatches {currentUser.name}&apos;s current tasks and carry-over backlog to recipients.
+              Dispatches {currentUser.name}&apos;s Day Plan without start/end times in exact table format.
             </p>
           </button>
 
@@ -626,10 +690,10 @@ export default function SettingsTab({
             className="p-4 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:hover:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-900/50 text-left transition-all active:scale-98 disabled:opacity-50"
           >
             <div className="text-xs font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
-              <span>🌙</span> Force Send Evening Team Summary
+              <span>🌙</span> Force Send &quot;Task Log&quot; Email
             </div>
             <p className="text-[11px] text-indigo-700/80 dark:text-indigo-400/80 mt-1">
-              Aggregates all team members&apos; completed tasks, backlogs, and daily logs.
+              Dispatches Task Log with full start/end times and productivity ratio in exact table format.
             </p>
           </button>
         </div>

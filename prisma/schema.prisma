@@ -29,6 +29,10 @@ model Task {
   dueDate       DateTime?
   recurrence    String     @default("NONE") // NONE, DAILY, WEEKLY
   lastResetDate DateTime?
+  startTime     String?    // e.g. "8.45" or "9.00"
+  endTime       String?    // e.g. "9.00" or "5.30"
+  priority      String     @default("High") // High, Medium, Low
+  assignedBy    String     @default("Myself") // Altitude1, Nimesh, Myself, etc.
   userId        String
   user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   subtasks      Subtask[]
@@ -67,6 +71,9 @@ model AppConfig {
   emailRecipients       String   @default("") // Comma-separated
   morningReportTime     String   @default("08:00") // HH:MM
   eveningReportTime     String   @default("18:00") // HH:MM
+  shiftStartTime        String   @default("8.30")
+  prepEndTime           String   @default("8.45")
+  shiftEndTime          String   @default("5.30")
   autoSendMorningReport Boolean  @default(false)
   autoSendDailyLog      Boolean  @default(false)
   defaultUserId         String?
