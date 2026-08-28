@@ -13,9 +13,7 @@ import {
   Repeat,
   AlertCircle,
   User,
-  SlidersHorizontal,
   ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
 import {
   toggleTaskComplete,
@@ -79,7 +77,7 @@ export default function TaskCard({
   const [isRevealed, setIsRevealed] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  // Touch Swipe Gesture State
+  // Touch Swipe Gesture State (for mobile only)
   const touchStartX = useRef<number | null>(null);
   const touchDeltaX = useRef<number>(0);
   const [dragOffset, setDragOffset] = useState<number>(0);
@@ -92,7 +90,7 @@ export default function TaskCard({
   const priority = task.priority || 'High';
   const assignedBy = task.assignedBy || 'Myself';
 
-  // Swipe Handlers
+  // Mobile Swipe Handlers
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
     touchDeltaX.current = 0;
@@ -106,12 +104,10 @@ export default function TaskCard({
     touchDeltaX.current = delta;
 
     if (isRevealed) {
-      // Swiping right from open state
-      const offset = Math.max(-120, Math.min(0, -120 + delta));
+      const offset = Math.max(-125, Math.min(0, -125 + delta));
       setDragOffset(offset);
     } else {
-      // Swiping left from closed state
-      const offset = Math.max(-120, Math.min(0, delta));
+      const offset = Math.max(-125, Math.min(0, delta));
       setDragOffset(offset);
     }
   };
@@ -199,8 +195,8 @@ export default function TaskCard({
     return (
       <>
         <div className="relative overflow-hidden rounded-xl group select-none">
-          {/* Underneath Revealed Actions */}
-          <div className="absolute inset-y-0 right-0 flex items-center pr-2 gap-1.5 z-0">
+          {/* Underneath Revealed Actions (Mobile Only) */}
+          <div className="sm:hidden absolute inset-y-0 right-0 flex items-center pr-2 gap-1.5 z-0">
             {onEdit && (
               <button
                 onClick={() => {
@@ -211,7 +207,7 @@ export default function TaskCard({
                 title="Edit"
               >
                 <Edit2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline text-[10px]">Edit</span>
+                <span className="text-[10px]">Edit</span>
               </button>
             )}
             <button
@@ -223,11 +219,11 @@ export default function TaskCard({
               title="Delete"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline text-[10px]">Delete</span>
+              <span className="text-[10px]">Delete</span>
             </button>
           </div>
 
-          {/* Sliding Front Row */}
+          {/* Front Row (Slide transform only active on mobile) */}
           <div
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
@@ -236,13 +232,16 @@ export default function TaskCard({
               if (isRevealed) setIsRevealed(false);
             }}
             style={{
-              transform: isDragging.current
-                ? `translateX(${dragOffset}px)`
-                : isRevealed
-                ? 'translateX(-120px)'
-                : 'translateX(0px)',
+              transform:
+                typeof window !== 'undefined' && window.innerWidth < 640
+                  ? isDragging.current
+                    ? `translateX(${dragOffset}px)`
+                    : isRevealed
+                    ? 'translateX(-120px)'
+                    : 'translateX(0px)'
+                  : undefined,
             }}
-            className="relative z-10 flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-slate-50/90 dark:bg-slate-900/90 border border-slate-200/60 dark:border-slate-800/60 opacity-60 hover:opacity-95 transition-transform duration-200 ease-out cursor-pointer"
+            className="relative z-10 flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-slate-50/90 dark:bg-slate-900/90 border border-slate-200/60 dark:border-slate-800/60 opacity-60 hover:opacity-95 transition-transform duration-200 ease-out"
           >
             <div className="flex items-center gap-2.5 flex-1 min-w-0">
               <button
@@ -265,14 +264,34 @@ export default function TaskCard({
               )}
             </div>
 
-            {/* Swipe hint / toggle on desktop or mobile */}
+            {/* Desktop Direct Icons */}
+            <div className="hidden sm:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {onEdit && (
+                <button
+                  onClick={() => onEdit(task)}
+                  className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded"
+                  title="Edit"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <button
+                onClick={() => setIsConfirmOpen(true)}
+                className="p-1 text-slate-400 hover:text-rose-500 rounded"
+                title="Delete"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Mobile slide indicator */}
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 setIsRevealed(!isRevealed);
               }}
-              className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded shrink-0"
+              className="sm:hidden p-1 text-slate-400 hover:text-slate-600 rounded shrink-0"
               title="Slide for actions"
             >
               <ChevronLeft className={`w-3.5 h-3.5 transition-transform ${isRevealed ? 'rotate-180' : ''}`} />
@@ -296,8 +315,8 @@ export default function TaskCard({
   return (
     <>
       <div className="relative overflow-hidden rounded-2xl group select-none">
-        {/* Underneath Revealed Actions (Edit & Delete) */}
-        <div className="absolute inset-y-0 right-0 flex items-center pr-3 gap-2 z-0">
+        {/* Underneath Revealed Actions (Mobile Only) */}
+        <div className="sm:hidden absolute inset-y-0 right-0 flex items-center pr-3 gap-2 z-0">
           {onEdit && (
             <button
               onClick={() => {
@@ -325,7 +344,7 @@ export default function TaskCard({
           </button>
         </div>
 
-        {/* Sliding Front Card Surface */}
+        {/* Sliding Front Card Surface (Slides only on Mobile, static on Desktop) */}
         <div
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -334,11 +353,14 @@ export default function TaskCard({
             if (isRevealed) setIsRevealed(false);
           }}
           style={{
-            transform: isDragging.current
-              ? `translateX(${dragOffset}px)`
-              : isRevealed
-              ? 'translateX(-135px)'
-              : 'translateX(0px)',
+            transform:
+              typeof window !== 'undefined' && window.innerWidth < 640
+                ? isDragging.current
+                  ? `translateX(${dragOffset}px)`
+                  : isRevealed
+                  ? 'translateX(-135px)'
+                  : 'translateX(0px)'
+                : undefined,
           }}
           className={`relative z-10 rounded-2xl border transition-transform duration-200 ease-out ${
             isCarryOver && !isDone
@@ -489,14 +511,35 @@ export default function TaskCard({
                 </div>
               </div>
 
-              {/* Slide Toggle Pill Button (Reveals Edit / Delete Underneath) */}
+              {/* Desktop Direct Quick Actions (Always/Hover on Desktop) */}
+              <div className="hidden sm:flex items-center gap-1 shrink-0">
+                {onEdit && (
+                  <button
+                    onClick={() => onEdit(task)}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    title="Edit Task"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsConfirmOpen(true)}
+                  disabled={isPending}
+                  className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                  title="Delete Task"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Mobile Slide Toggle Pill Button (Reveals Edit / Delete Underneath on Mobile Only) */}
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsRevealed(!isRevealed);
                 }}
-                className={`p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-all shrink-0 ${
+                className={`sm:hidden p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-all shrink-0 ${
                   isRevealed ? 'bg-blue-100 dark:bg-blue-950 text-blue-600' : 'hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
                 title={isRevealed ? 'Close actions' : 'Slide to edit or delete'}
