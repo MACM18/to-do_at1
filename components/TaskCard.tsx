@@ -31,6 +31,7 @@ interface Subtask {
   id: string;
   title: string;
   isDone: boolean;
+  weight?: number | null;
   taskId: string;
 }
 
@@ -381,41 +382,58 @@ export default function TaskCard({
                 Subtasks ({completedSubtasks}/{task.subtasks?.length || 0})
               </div>
 
-              {task.subtasks?.map((subtask) => (
-                <div
-                  key={subtask.id}
-                  className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                >
-                  <button
-                    onClick={() => handleSubtaskToggle(subtask.id)}
-                    disabled={isPending}
-                    className="flex items-center gap-2.5 flex-1 text-left"
+              {task.subtasks?.map((subtask) => {
+                const weightVal =
+                  typeof subtask.weight === 'number'
+                    ? `${subtask.weight}%`
+                    : task.subtasks.length > 0
+                    ? `${Math.round(100 / task.subtasks.length)}%`
+                    : '';
+
+                return (
+                  <div
+                    key={subtask.id}
+                    className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                   >
-                    {subtask.isDone ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    ) : (
-                      <Circle className="w-4 h-4 text-slate-400 shrink-0" />
-                    )}
-                    <span
-                      className={`text-xs ${
-                        subtask.isDone
-                          ? 'line-through text-slate-400 dark:text-slate-500'
-                          : 'text-slate-800 dark:text-slate-200'
-                      }`}
+                    <button
+                      onClick={() => handleSubtaskToggle(subtask.id)}
+                      disabled={isPending}
+                      className="flex items-center gap-2.5 flex-1 text-left min-w-0"
                     >
-                      {subtask.title}
-                    </span>
-                  </button>
-                  <button
-                    onClick={() => handleDeleteSubtask(subtask.id)}
-                    disabled={isPending}
-                    className="text-slate-400 hover:text-rose-500 p-1 transition-colors"
-                    title="Remove Subtask"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
+                      {subtask.isDone ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      ) : (
+                        <Circle className="w-4 h-4 text-slate-400 shrink-0" />
+                      )}
+                      <span
+                        className={`text-xs truncate flex-1 ${
+                          subtask.isDone
+                            ? 'line-through text-slate-400 dark:text-slate-500'
+                            : 'text-slate-800 dark:text-slate-200'
+                        }`}
+                      >
+                        {subtask.title}
+                      </span>
+                    </button>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {weightVal && (
+                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-900/50">
+                          {weightVal}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => handleDeleteSubtask(subtask.id)}
+                        disabled={isPending}
+                        className="text-slate-400 hover:text-rose-500 p-1 transition-colors"
+                        title="Remove Subtask"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
 
               {/* Inline Add Subtask */}
               <form onSubmit={handleAddSubtask} className="flex items-center gap-2 pt-1">

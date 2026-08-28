@@ -1,7 +1,21 @@
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
-import { X, Plus, Trash2, Calendar, Repeat, User, Sparkles, Clock, AlertTriangle } from 'lucide-react';
+import {
+  X,
+  Plus,
+  Trash2,
+  Calendar,
+  Repeat,
+  User,
+  Sparkles,
+  Clock,
+  AlertTriangle,
+  Sliders,
+  Percent,
+  Check,
+  RotateCcw,
+} from 'lucide-react';
 import { createTask, updateTask } from '@/lib/actions/task-actions';
 
 interface UserOption {
@@ -9,6 +23,13 @@ interface UserOption {
   name: string;
   email: string;
   role: string;
+}
+
+interface SubtaskItem {
+  id?: string;
+  title: string;
+  weight: number; // 0 - 100
+  isDone?: boolean;
 }
 
 interface TaskModalProps {
@@ -35,7 +56,7 @@ export default function TaskModal({
   const [endTime, setEndTime] = useState('');
   const [priority, setPriority] = useState('High');
   const [assignedBy, setAssignedBy] = useState('Myself');
-  const [subtasks, setSubtasks] = useState<string[]>([]);
+  const [subtasks, setSubtasks] = useState<SubtaskItem[]>([]);
   const [subtaskInput, setSubtaskInput] = useState('');
   const [isPending, startTransition] = useTransition();
 
@@ -54,7 +75,29 @@ export default function TaskModal({
       setEndTime(editingTask.endTime || '');
       setPriority(editingTask.priority || 'High');
       setAssignedBy(editingTask.assignedBy || 'Myself');
-      setSubtasks(editingTask.subtasks ? editingTask.subtasks.map((s: any) => s.title) : []);
+
+      if (editingTask.subtasks && editingTask.subtasks.length > 0) {
+        const count = editingTask.subtasks.length;
+        const defaultWeight = Math.floor(100 / count);
+        setSubtasks(
+          editingTask.subtasks.map((s: any, idx: number) => {
+            const w =
+              typeof s.weight === 'number'
+                ? s.weight
+                : idx === 0
+                ? 100 - defaultWeight * (count - 1)
+                : defaultWeight;
+            return {
+              id: s.id,
+              title: s.title,
+              weight: w,
+              isDone: s.isDone,
+            };
+          })
+        );
+      } else {
+        setSubtasks([]);
+      }
     } else {
       setTitle('');
       setDescription('');
@@ -71,14 +114,40 @@ export default function TaskModal({
 
   if (!isOpen) return null;
 
+  const totalWeight = subtasks.reduce((sum, s) => sum + (s.weight || 0), 0);
+
   const handleAddSubtask = () => {
     if (!subtaskInput.trim()) return;
-    setSubtasks([...subtasks, subtaskInput.trim()]);
+    const remaining = Math.max(0, 100 - totalWeight);
+    const newWeight = remaining > 0 ? remaining : 10;
+    const newSubtasks = [...subtasks, { title: subtaskInput.trim(), weight: newWeight }];
+    setSubtasks(newSubtasks);
     setSubtaskInput('');
   };
 
   const handleRemoveSubtask = (index: number) => {
-    setSubtasks(subtasks.filter((_, i) => i !== index));
+    const updated = subtasks.filter((_, i) => i !== index);
+    setSubtasks(updated);
+  };
+
+  const handleWeightChange = (index: number, newWeight: number) => {
+    const clamped = Math.min(100, Math.max(0, newWeight));
+    const updated = [...subtasks];
+    updated[index] = { ...updated[index], weight: clamped };
+    setSubtasks(updated);
+  };
+
+  const handleAutoEqualSplit = () => {
+    if (subtasks.length === 0) return;
+    const count = subtasks.length;
+    const base = Math.floor(100 / count);
+    const remainder = 100 - base * count;
+
+    const updated = subtasks.map((s, idx) => ({
+      ...s,
+      weight: idx === 0 ? base + remainder : base,
+    }));
+    setSubtasks(updated);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -96,6 +165,12 @@ export default function TaskModal({
           endTime: endTime || null,
           priority,
           assignedBy,
+          subtasks: subtasks.map((s) => ({
+            id: s.id,
+            title: s.title,
+            weight: s.weight,
+            isDone: s.isDone,
+          })),
         });
       } else {
         await createTask({
@@ -108,7 +183,10 @@ export default function TaskModal({
           endTime: endTime || null,
           priority,
           assignedBy,
-          subtaskTitles: subtasks,
+          subtasks: subtasks.map((s) => ({
+            title: s.title,
+            weight: s.weight,
+          })),
         });
       }
       onClose();
@@ -126,10 +204,12 @@ export default function TaskModal({
             </span>
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                {editingTask ? 'Edit Task' : 'Create New Task'}
+                {editingTask ? 'Edit Task & Weights' : 'Create New Task'}
               </h2>
               <p className="text-xs text-slate-500">
-                {editingTask ? 'Update task details and report metadata' : 'Add task with report time, priority & assignment'}
+                {editingTask
+                  ? 'Update task details and custom subtask percentage weights'
+                  : 'Add task with report time, priority & subtask weights'}
               </p>
             </div>
           </div>
@@ -258,54 +338,122 @@ export default function TaskModal({
             </div>
           </div>
 
-          {/* Subtasks (when creating new task) */}
-          {!editingTask && (
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Subtasks (Auto-calculates weighted productivity %)
-              </label>
-              <div className="space-y-2 mb-2">
-                {subtasks.map((st, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200"
-                  >
-                    <span>• {st}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveSubtask(idx)}
-                      className="text-slate-400 hover:text-red-500"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
+          {/* Subtasks with Custom Percentage Weight Sliders */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
+                  <Sliders className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    Subtasks & Percentage Weights
+                  </label>
+                  <p className="text-[10px] text-slate-500">
+                    Customize the percentage contribution of each subtask to 100%
+                  </p>
+                </div>
               </div>
 
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={subtaskInput}
-                  onChange={(e) => setSubtaskInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddSubtask();
-                    }
-                  }}
-                  placeholder="e.g., Create IAM Role, Write unit test..."
-                  className="flex-1 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+              {subtasks.length > 1 && (
                 <button
                   type="button"
-                  onClick={handleAddSubtask}
-                  className="px-3 py-1.5 text-xs font-semibold bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl flex items-center gap-1 transition-colors"
+                  onClick={handleAutoEqualSplit}
+                  className="px-2.5 py-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 rounded-lg flex items-center gap-1 transition-colors"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Add
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Equal Split</span>
                 </button>
-              </div>
+              )}
             </div>
-          )}
+
+            {/* Total Weight Status Bar */}
+            {subtasks.length > 0 && (
+              <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 text-xs">
+                <span className="font-semibold text-slate-600 dark:text-slate-400">
+                  Total Subtask Weights:
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`font-mono font-bold px-2 py-0.5 rounded-full text-[11px] ${
+                      totalWeight === 100
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                        : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                    }`}
+                  >
+                    {totalWeight}% {totalWeight === 100 ? '✓ (100%)' : ''}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* List of Subtasks with Sliders */}
+            <div className="space-y-2.5">
+              {subtasks.map((st, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 space-y-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex-1 truncate">
+                      {idx + 1}. {st.title}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-lg bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                        {st.weight}%
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSubtask(idx)}
+                        className="text-slate-400 hover:text-rose-500 p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Percentage Slider */}
+                  <div className="flex items-center gap-3 pt-0.5">
+                    <span className="text-[10px] text-slate-400 font-mono">0%</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={st.weight}
+                      onChange={(e) => handleWeightChange(idx, Number(e.target.value))}
+                      className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                    />
+                    <span className="text-[10px] text-slate-400 font-mono">100%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Add New Subtask Input */}
+            <div className="flex gap-2 pt-1">
+              <input
+                type="text"
+                value={subtaskInput}
+                onChange={(e) => setSubtaskInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddSubtask();
+                  }
+                }}
+                placeholder="Add a subtask (e.g., Code API endpoints)..."
+                className="flex-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="button"
+                onClick={handleAddSubtask}
+                className="px-3.5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center gap-1 transition-all shadow-sm active:scale-95"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add
+              </button>
+            </div>
+          </div>
 
           {/* Footer Buttons */}
           <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-3">

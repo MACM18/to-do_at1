@@ -4,6 +4,37 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '../prisma';
 import { processRecurringTasks } from '../recurrence';
 
+/**
+ * Calculates progress and status based on subtasks.
+ * If subtasks have custom weights (percentages), it sums the weights of completed subtasks.
+ * Otherwise, it divides 100% equally among subtasks.
+ */
+function calculateTaskProgress(
+  subtasks: { isDone: boolean; weight?: number | null }[]
+): { progress: number; status: string } {
+  if (!subtasks || subtasks.length === 0) {
+    return { progress: 0, status: 'TODO' };
+  }
+
+  const hasCustomWeights = subtasks.some(
+    (s) => s.weight !== null && s.weight !== undefined && s.weight > 0
+  );
+
+  if (hasCustomWeights) {
+    const completedWeight = subtasks
+      .filter((s) => s.isDone)
+      .reduce((sum, s) => sum + (s.weight || 0), 0);
+    const progress = Math.min(100, Math.max(0, Math.round(completedWeight)));
+    const status = progress >= 100 ? 'DONE' : progress > 0 ? 'IN_PROGRESS' : 'TODO';
+    return { progress, status };
+  } else {
+    const completedCount = subtasks.filter((s) => s.isDone).length;
+    const progress = Math.round((completedCount / subtasks.length) * 100);
+    const status = progress >= 100 ? 'DONE' : progress > 0 ? 'IN_PROGRESS' : 'TODO';
+    return { progress, status };
+  }
+}
+
 export async function getTasks(userId?: string) {
   await processRecurringTasks(userId);
 
@@ -34,20 +65,33 @@ export async function createTask(formData: {
   priority?: string;
   assignedBy?: string;
   subtaskTitles?: string[];
+  subtasks?: { title: string; weight?: number | null }[];
 }) {
   if (!formData.title?.trim()) {
     throw new Error('Task title is required');
   }
 
-  const subtasksData =
-    formData.subtaskTitles && formData.subtaskTitles.length > 0
-      ? formData.subtaskTitles
-          .filter((t) => t.trim().length > 0)
-          .map((title) => ({
-            title: title.trim(),
-            isDone: false,
-          }))
-      : [];
+  let subtasksData: { title: string; weight?: number | null; isDone: boolean }[] = [];
+
+  if (formData.subtasks && formData.subtasks.length > 0) {
+    subtasksData = formData.subtasks
+      .filter((s) => s.title?.trim().length > 0)
+      .map((s) => ({
+        title: s.title.trim(),
+        weight: typeof s.weight === 'number' ? s.weight : null,
+        isDone: false,
+      }));
+  } else if (formData.subtaskTitles && formData.subtaskTitles.length > 0) {
+    subtasksData = formData.subtaskTitles
+      .filter((t) => t.trim().length > 0)
+      .map((title) => ({
+        title: title.trim(),
+        weight: null,
+        isDone: false,
+      }));
+  }
+
+  const { progress, status } = calculateTaskProgress(subtasksData);
 
   const task = await prisma.task.create({
     data: {
@@ -60,8 +104,8 @@ export async function createTask(formData: {
       endTime: formData.endTime?.trim() || null,
       priority: formData.priority || 'High',
       assignedBy: formData.assignedBy?.trim() || 'Myself',
-      status: 'TODO',
-      progress: 0,
+      status: status,
+      progress: progress,
       subtasks: {
         create: subtasksData,
       },
@@ -88,6 +132,7 @@ export async function updateTask(
     endTime?: string | null;
     priority?: string;
     assignedBy?: string;
+    subtasks?: { id?: string; title: string; weight?: number | null; isDone?: boolean }[];
   }
 ) {
   const updatePayload: any = {};
@@ -102,6 +147,50 @@ export async function updateTask(
   if (data.endTime !== undefined) updatePayload.endTime = data.endTime?.trim() || null;
   if (data.priority !== undefined) updatePayload.priority = data.priority;
   if (data.assignedBy !== undefined) updatePayload.assignedBy = data.assignedBy?.trim() || 'Myself';
+
+  // If subtasks array is supplied in update, sync them
+  if (data.subtasks !== undefined) {
+    const existingSubtasks = await prisma.subtask.findMany({ where: { taskId } });
+    const existingIds = existingSubtasks.map((s) => s.id);
+    const providedIds = data.subtasks.map((s) => s.id).filter(Boolean) as string[];
+
+    // Delete subtasks that were removed
+    const toDelete = existingIds.filter((id) => !providedIds.includes(id));
+    if (toDelete.length > 0) {
+      await prisma.subtask.deleteMany({
+        where: { id: { in: toDelete } },
+      });
+    }
+
+    // Upsert provided subtasks
+    for (const st of data.subtasks) {
+      if (st.id && existingIds.includes(st.id)) {
+        await prisma.subtask.update({
+          where: { id: st.id },
+          data: {
+            title: st.title.trim(),
+            weight: typeof st.weight === 'number' ? st.weight : null,
+            ...(st.isDone !== undefined ? { isDone: st.isDone } : {}),
+          },
+        });
+      } else if (st.title.trim()) {
+        await prisma.subtask.create({
+          data: {
+            taskId,
+            title: st.title.trim(),
+            weight: typeof st.weight === 'number' ? st.weight : null,
+            isDone: Boolean(st.isDone),
+          },
+        });
+      }
+    }
+
+    // Recalculate progress from fresh subtasks
+    const freshSubtasks = await prisma.subtask.findMany({ where: { taskId } });
+    const calculated = calculateTaskProgress(freshSubtasks);
+    updatePayload.progress = calculated.progress;
+    updatePayload.status = calculated.status;
+  }
 
   const task = await prisma.task.update({
     where: { id: taskId },
@@ -173,49 +262,43 @@ export async function toggleSubtask(subtaskId: string, taskId: string) {
   });
 
   const allSubtasks = await prisma.subtask.findMany({ where: { taskId } });
-  const completedCount = allSubtasks.filter((s) =>
-    s.id === subtaskId ? newDoneState : s.isDone
-  ).length;
+  const updatedSubtasks = allSubtasks.map((s) =>
+    s.id === subtaskId ? { ...s, isDone: newDoneState } : s
+  );
 
-  const total = allSubtasks.length;
-  const progressPercent = total > 0 ? Math.round((completedCount / total) * 100) : 0;
-  const status =
-    progressPercent === 100 ? 'DONE' : progressPercent > 0 ? 'IN_PROGRESS' : 'TODO';
+  const { progress, status } = calculateTaskProgress(updatedSubtasks);
 
   await prisma.task.update({
     where: { id: taskId },
     data: {
-      progress: progressPercent,
+      progress: progress,
       status: status,
     },
   });
 
   revalidatePath('/');
-  return { progress: progressPercent, status };
+  return { progress, status };
 }
 
-export async function addSubtask(taskId: string, title: string) {
+export async function addSubtask(taskId: string, title: string, weight?: number | null) {
   if (!title.trim()) return null;
 
   const subtask = await prisma.subtask.create({
     data: {
       taskId,
       title: title.trim(),
+      weight: typeof weight === 'number' ? weight : null,
       isDone: false,
     },
   });
 
   const allSubtasks = await prisma.subtask.findMany({ where: { taskId } });
-  const completedCount = allSubtasks.filter((s) => s.isDone).length;
-  const total = allSubtasks.length;
-  const progressPercent = Math.round((completedCount / total) * 100);
-  const status =
-    progressPercent === 100 ? 'DONE' : progressPercent > 0 ? 'IN_PROGRESS' : 'TODO';
+  const { progress, status } = calculateTaskProgress(allSubtasks);
 
   await prisma.task.update({
     where: { id: taskId },
     data: {
-      progress: progressPercent,
+      progress: progress,
       status: status,
     },
   });
@@ -224,22 +307,48 @@ export async function addSubtask(taskId: string, title: string) {
   return subtask;
 }
 
+export async function updateSubtask(
+  subtaskId: string,
+  taskId: string,
+  data: { title?: string; weight?: number | null; isDone?: boolean }
+) {
+  const updateData: any = {};
+  if (data.title !== undefined) updateData.title = data.title.trim();
+  if (data.weight !== undefined) updateData.weight = data.weight;
+  if (data.isDone !== undefined) updateData.isDone = data.isDone;
+
+  await prisma.subtask.update({
+    where: { id: subtaskId },
+    data: updateData,
+  });
+
+  const allSubtasks = await prisma.subtask.findMany({ where: { taskId } });
+  const { progress, status } = calculateTaskProgress(allSubtasks);
+
+  await prisma.task.update({
+    where: { id: taskId },
+    data: {
+      progress,
+      status,
+    },
+  });
+
+  revalidatePath('/');
+  return { progress, status };
+}
+
 export async function deleteSubtask(subtaskId: string, taskId: string) {
   await prisma.subtask.delete({
     where: { id: subtaskId },
   });
 
   const allSubtasks = await prisma.subtask.findMany({ where: { taskId } });
-  const total = allSubtasks.length;
-  const completedCount = allSubtasks.filter((s) => s.isDone).length;
-  const progressPercent = total > 0 ? Math.round((completedCount / total) * 100) : 0;
-  const status =
-    progressPercent === 100 ? 'DONE' : progressPercent > 0 ? 'IN_PROGRESS' : 'TODO';
+  const { progress, status } = calculateTaskProgress(allSubtasks);
 
   await prisma.task.update({
     where: { id: taskId },
     data: {
-      progress: progressPercent,
+      progress: progress,
       status: status,
     },
   });
