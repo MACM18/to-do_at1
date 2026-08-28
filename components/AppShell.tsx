@@ -65,7 +65,7 @@ export default function AppShell({
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
       {/* Top Navbar */}
-      <header className="sticky top-0 z-40 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 safe-top">
+      <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 safe-top">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
           {/* Logo & App Name */}
           <div className="flex items-center gap-2.5">
@@ -173,7 +173,7 @@ export default function AppShell({
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 pt-6">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 pt-4 sm:pt-6 pb-28 sm:pb-8">
         {activeTab === 'MY_TASKS' && (
           <MyTasksTab
             currentUser={currentUser}

@@ -672,15 +672,15 @@ export default function MyTasksTab({
         </div>
       </div>
 
-      {/* Mobile Floating Action Button (FAB) positioned above the bottom navbar */}
-      <div className="sm:hidden fixed bottom-20 right-4 z-40">
+      {/* Mobile Floating Action Button (FAB) positioned safely above the bottom navbar */}
+      <div className="sm:hidden fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] right-5 z-40">
         <button
           type="button"
           onClick={() => {
             setEditingTask(null);
             setIsTaskModalOpen(true);
           }}
-          className="w-14 h-14 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-xl shadow-blue-500/35 flex items-center justify-center transition-transform active:scale-90 hover:scale-105 border-2 border-white dark:border-slate-800"
+          className="w-14 h-14 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-xl shadow-blue-500/40 flex items-center justify-center transition-transform active:scale-90 hover:scale-105 border-2 border-white dark:border-slate-800"
           aria-label="Add Task"
         >
           <Plus className="w-6 h-6 stroke-[2.5]" />
