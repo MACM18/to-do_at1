@@ -1,0 +1,74 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String     @id @default(cuid())
+  name      String
+  email     String     @unique
+  role      String     @default("MEMBER") // LEAD, MEMBER
+  avatar    String?
+  isActive  Boolean    @default(true)
+  tasks     Task[]
+  logs      DailyLog[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Task {
+  id            String     @id @default(cuid())
+  title         String
+  description   String?
+  status        String     @default("TODO") // TODO, IN_PROGRESS, DONE
+  progress      Int        @default(0) // 0 - 100
+  dueDate       DateTime?
+  recurrence    String     @default("NONE") // NONE, DAILY, WEEKLY
+  lastResetDate DateTime?
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subtasks      Subtask[]
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model Subtask {
+  id        String   @id @default(cuid())
+  title     String
+  isDone    Boolean  @default(false)
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DailyLog {
+  id        String   @id @default(cuid())
+  summary   String
+  blockers  String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+}
+
+model AppConfig {
+  id                    String   @id @default("global_config")
+  smtpHost              String   @default("smtp.gmail.com")
+  smtpPort              Int      @default(465)
+  smtpUser              String   @default("")
+  smtpPassword          String   @default("")
+  smtpSecure            Boolean  @default(true)
+  senderName            String   @default("Daily Focus & Team Tracker")
+  emailRecipients       String   @default("") // Comma-separated
+  morningReportTime     String   @default("08:00") // HH:MM
+  eveningReportTime     String   @default("18:00") // HH:MM
+  autoSendMorningReport Boolean  @default(false)
+  autoSendDailyLog      Boolean  @default(false)
+  defaultUserId         String?
+  updatedAt             DateTime @updatedAt
+}
