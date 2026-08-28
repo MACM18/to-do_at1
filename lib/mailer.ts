@@ -75,6 +75,75 @@ export async function verifySmtpConnection(customConfig?: {
 }
 
 /**
+ * Retrieves or initializes monthly email thread metadata for threading replies.
+ */
+async function getMonthlyThreadDetails(userId: string, targetDate: Date = new Date()) {
+  const year = targetDate.getFullYear();
+  const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+  const monthKey = `${year}-${month}`; // e.g. "2026-08"
+
+  const monthName = targetDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const userName = user?.name || 'Lead';
+
+  const baseSubject = `Daily Tasks & Work Log - ${userName} - ${monthName}`;
+
+  const existingThread = await prisma.monthlyEmailThread.findUnique({
+    where: {
+      userId_monthKey: {
+        userId,
+        monthKey,
+      },
+    },
+  });
+
+  return {
+    monthKey,
+    monthName,
+    baseSubject,
+    existingThread,
+  };
+}
+
+/**
+ * Records the latest message ID to keep the monthly thread chained.
+ */
+async function saveMonthlyThreadMessage(
+  userId: string,
+  monthKey: string,
+  baseSubject: string,
+  messageId: string
+) {
+  if (!messageId) return;
+
+  const existing = await prisma.monthlyEmailThread.findUnique({
+    where: {
+      userId_monthKey: {
+        userId,
+        monthKey,
+      },
+    },
+  });
+
+  if (existing) {
+    await prisma.monthlyEmailThread.update({
+      where: { id: existing.id },
+      data: { lastMessageId: messageId },
+    });
+  } else {
+    await prisma.monthlyEmailThread.create({
+      data: {
+        userId,
+        monthKey,
+        rootMessageId: messageId,
+        lastMessageId: messageId,
+        subject: baseSubject,
+      },
+    });
+  }
+}
+
+/**
  * Generates the pixel-perfect HTML table matching the user's template.
  * @param mode 'morning' (Day Plan - no start/end times) | 'evening' (Task Log - with start/end times)
  */
@@ -334,7 +403,8 @@ export async function sendTestEmail(targetEmail: string): Promise<EmailSendResul
 
 /**
  * 1. Morning Day Plan Trigger (Personal)
- * Incorporates today's daily customized check-in time if available
+ * Sends as a reply within the current month's conversation thread.
+ * Automatically initiates a new thread at the start of each month.
  */
 export async function sendMorningTodoList(
   userId?: string,
@@ -422,27 +492,48 @@ export async function sendMorningTodoList(
 
     const transporter = await getTransporter();
 
-    const formattedDate = new Date().toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+    // Get Monthly Threading Details
+    const { monthKey, baseSubject, existingThread } = await getMonthlyThreadDetails(
+      targetUser.id,
+      todayStart
+    );
 
     const emailHtml = buildReportTableHtml({
       user: targetUser,
       tasks,
       config,
       mode: 'morning',
-      customShift: shift ? { shiftStartTime: shift.shiftStartTime, prepEndTime: shift.prepEndTime, shiftEndTime: shift.shiftEndTime } : undefined,
+      customShift: shift
+        ? {
+            shiftStartTime: shift.shiftStartTime,
+            prepEndTime: shift.prepEndTime,
+            shiftEndTime: shift.shiftEndTime,
+          }
+        : undefined,
     });
 
-    const info = await transporter.sendMail({
+    const mailOptions: any = {
       from: `"${config.senderName || 'Daily Focus'}" <${config.smtpUser}>`,
       to: recipients.join(', '),
-      subject: `Day Plan - ${targetUser.name} (${formattedDate})`,
+      subject: existingThread ? `Re: ${existingThread.subject}` : baseSubject,
       html: emailHtml,
-    });
+    };
+
+    // Attach In-Reply-To and References to chain into the monthly thread
+    if (existingThread && existingThread.rootMessageId) {
+      const lastMsg = existingThread.lastMessageId || existingThread.rootMessageId;
+      mailOptions.inReplyTo = lastMsg;
+      mailOptions.references = `${existingThread.rootMessageId} ${lastMsg}`.trim();
+      mailOptions.headers = {
+        'In-Reply-To': lastMsg,
+        References: `${existingThread.rootMessageId} ${lastMsg}`.trim(),
+      };
+    }
+
+    const info = await transporter.sendMail(mailOptions);
+
+    // Save/update this month's thread message ID
+    await saveMonthlyThreadMessage(targetUser.id, monthKey, baseSubject, info.messageId);
 
     return {
       success: true,
@@ -462,7 +553,8 @@ export async function sendMorningTodoList(
 
 /**
  * 2. Evening Task Log Trigger (Personal)
- * Incorporates today's daily customized check-out time and check-in time
+ * Sends as a reply within the current month's conversation thread.
+ * Automatically initiates a new thread at the start of each month.
  */
 export async function sendDailySummaryReport(
   recipientOverride?: string,
@@ -519,6 +611,12 @@ export async function sendDailySummaryReport(
       orderBy: [{ role: 'asc' }, { name: 'asc' }],
     });
 
+    if (users.length === 0) {
+      throw new Error('No active user found to send report for.');
+    }
+
+    const primaryUser = users[0];
+
     // If customCheckOutTime passed for targeted user, persist it
     if (targetUserId && customCheckOutTime && customCheckOutTime.trim()) {
       const existing = await prisma.dailyShift.findFirst({
@@ -542,12 +640,11 @@ export async function sendDailySummaryReport(
 
     const transporter = await getTransporter();
 
-    const formattedDate = new Date().toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+    // Get Monthly Threading Details
+    const { monthKey, baseSubject, existingThread } = await getMonthlyThreadDetails(
+      primaryUser.id,
+      todayStart
+    );
 
     let combinedHtml = '';
     let totalTasksCount = 0;
@@ -556,7 +653,9 @@ export async function sendDailySummaryReport(
       totalTasksCount += u.tasks.length;
       const userShift = u.shifts[0] || null;
       const finalShiftEnd =
-        (u.id === targetUserId && customCheckOutTime?.trim()) || userShift?.shiftEndTime || config?.shiftEndTime;
+        (u.id === targetUserId && customCheckOutTime?.trim()) ||
+        userShift?.shiftEndTime ||
+        config?.shiftEndTime;
 
       combinedHtml += buildReportTableHtml({
         user: u,
@@ -572,17 +671,28 @@ export async function sendDailySummaryReport(
       combinedHtml += '<br/><br/>';
     }
 
-    const subjectTitle =
-      users.length === 1
-        ? `Task Log - ${users[0].name} (${formattedDate})`
-        : `Task Log Summary - (${formattedDate})`;
-
-    const info = await transporter.sendMail({
+    const mailOptions: any = {
       from: `"${config.senderName || 'Daily Tracker'}" <${config.smtpUser}>`,
       to: recipients.join(', '),
-      subject: subjectTitle,
+      subject: existingThread ? `Re: ${existingThread.subject}` : baseSubject,
       html: combinedHtml,
-    });
+    };
+
+    // Attach In-Reply-To and References to chain into the monthly thread
+    if (existingThread && existingThread.rootMessageId) {
+      const lastMsg = existingThread.lastMessageId || existingThread.rootMessageId;
+      mailOptions.inReplyTo = lastMsg;
+      mailOptions.references = `${existingThread.rootMessageId} ${lastMsg}`.trim();
+      mailOptions.headers = {
+        'In-Reply-To': lastMsg,
+        References: `${existingThread.rootMessageId} ${lastMsg}`.trim(),
+      };
+    }
+
+    const info = await transporter.sendMail(mailOptions);
+
+    // Save/update this month's thread message ID
+    await saveMonthlyThreadMessage(primaryUser.id, monthKey, baseSubject, info.messageId);
 
     return {
       success: true,

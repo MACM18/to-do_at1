@@ -8,17 +8,18 @@ generator client {
 }
 
 model User {
-  id        String       @id @default(cuid())
+  id        String               @id @default(cuid())
   name      String
-  email     String       @unique
-  role      String       @default("MEMBER") // LEAD, MEMBER
+  email     String               @unique
+  role      String               @default("MEMBER") // LEAD, MEMBER
   avatar    String?
-  isActive  Boolean      @default(true)
+  isActive  Boolean              @default(true)
   tasks     Task[]
   logs      DailyLog[]
   shifts    DailyShift[]
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  threads   MonthlyEmailThread[]
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
 }
 
 model Task {
@@ -73,6 +74,20 @@ model DailyShift {
   updatedAt      DateTime @updatedAt
 
   @@unique([userId, date])
+}
+
+model MonthlyEmailThread {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  monthKey      String   // e.g. "2026-08"
+  rootMessageId String   // The Message-ID of the first email of the month
+  lastMessageId String?  // The Message-ID of the latest email
+  subject       String   // The base subject of the thread
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, monthKey])
 }
 
 model AppConfig {
