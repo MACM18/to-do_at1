@@ -2,9 +2,12 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '../prisma';
+import { ensureMainUser } from './auth-actions';
 
 export async function getUsers() {
-  let users = await prisma.user.findMany({
+  await ensureMainUser();
+
+  return prisma.user.findMany({
     include: {
       _count: {
         select: {
@@ -15,33 +18,12 @@ export async function getUsers() {
     },
     orderBy: [{ role: 'asc' }, { name: 'asc' }],
   });
-
-  if (users.length === 0) {
-    const defaultLead = await prisma.user.create({
-      data: {
-        name: 'Chathura (Lead)',
-        email: 'chathura@example.com',
-        role: 'LEAD',
-        isActive: true,
-      },
-      include: {
-        _count: {
-          select: {
-            tasks: true,
-            logs: true,
-          },
-        },
-      },
-    });
-    users = [defaultLead];
-  }
-
-  return users;
 }
 
 export async function createUser(data: {
   name: string;
   email: string;
+  password?: string;
   role?: string;
 }) {
   if (!data.name?.trim() || !data.email?.trim()) {
@@ -60,6 +42,7 @@ export async function createUser(data: {
     data: {
       name: data.name.trim(),
       email: data.email.trim().toLowerCase(),
+      password: data.password?.trim() || null,
       role: data.role || 'MEMBER',
       isActive: true,
     },
@@ -74,6 +57,7 @@ export async function updateUser(
   data: {
     name?: string;
     email?: string;
+    password?: string;
     role?: string;
     isActive?: boolean;
   }
@@ -81,6 +65,9 @@ export async function updateUser(
   const updatePayload: any = {};
   if (data.name !== undefined) updatePayload.name = data.name.trim();
   if (data.email !== undefined) updatePayload.email = data.email.trim().toLowerCase();
+  if (data.password !== undefined && data.password !== '') {
+    updatePayload.password = data.password.trim();
+  }
   if (data.role !== undefined) updatePayload.role = data.role;
   if (data.isActive !== undefined) updatePayload.isActive = data.isActive;
 

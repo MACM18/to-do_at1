@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
-import { X, UserPlus, Users } from 'lucide-react';
+import { X, UserPlus, Users, Lock, Eye, EyeOff } from 'lucide-react';
 import { createUser, updateUser } from '@/lib/actions/user-actions';
 
 interface UserModalProps {
@@ -17,6 +17,8 @@ export default function UserModal({
 }: UserModalProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState('MEMBER');
   const [isActive, setIsActive] = useState(true);
   const [error, setError] = useState('');
@@ -26,12 +28,14 @@ export default function UserModal({
     if (editingUser) {
       setName(editingUser.name || '');
       setEmail(editingUser.email || '');
+      setPassword('');
       setRole(editingUser.role || 'MEMBER');
       setIsActive(editingUser.isActive !== undefined ? editingUser.isActive : true);
       setError('');
     } else {
       setName('');
       setEmail('');
+      setPassword('');
       setRole('MEMBER');
       setIsActive(true);
       setError('');
@@ -51,6 +55,7 @@ export default function UserModal({
           await updateUser(editingUser.id, {
             name,
             email,
+            password: password.trim() || undefined,
             role,
             isActive,
           });
@@ -58,6 +63,7 @@ export default function UserModal({
           await createUser({
             name,
             email,
+            password: password.trim() || undefined,
             role,
           });
         }
@@ -81,7 +87,7 @@ export default function UserModal({
               <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
                 {editingUser ? 'Edit Team Member' : 'Add Team Member'}
               </h2>
-              <p className="text-xs text-slate-500">Manage employee role and access</p>
+              <p className="text-xs text-slate-500">Manage employee role, access & password</p>
             </div>
           </div>
           <button
@@ -110,7 +116,7 @@ export default function UserModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Alex Rivera"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -124,8 +130,30 @@ export default function UserModal({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="e.g., alex@company.com"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Login Password {editingUser ? '(Leave blank to keep current)' : '(Optional)'}
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Assign login password"
+                className="w-full pl-3.5 pr-10 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -136,7 +164,7 @@ export default function UserModal({
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="MEMBER">Member (Contributor)</option>
                 <option value="LEAD">Team Lead / Manager</option>
@@ -151,7 +179,7 @@ export default function UserModal({
                 <select
                   value={isActive ? 'true' : 'false'}
                   onChange={(e) => setIsActive(e.target.value === 'true')}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="true">Active</option>
                   <option value="false">Deactivated</option>

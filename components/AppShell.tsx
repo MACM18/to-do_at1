@@ -1,20 +1,25 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useTransition } from 'react';
 import {
   CheckSquare,
   Users,
   Settings,
   RefreshCw,
+  LogOut,
   UserCheck,
+  Shield,
+  Loader2,
 } from 'lucide-react';
 import MyTasksTab from './MyTasksTab';
 import TeamViewTab from './TeamViewTab';
 import SettingsTab from './SettingsTab';
 import UserSwitcher from './UserSwitcher';
+import { logoutAction } from '@/lib/actions/auth-actions';
 import { useRouter } from 'next/navigation';
 
 interface AppShellProps {
+  sessionUser: any;
   initialUsers: any[];
   initialTasks: any[];
   initialLogs: any[];
@@ -22,6 +27,7 @@ interface AppShellProps {
 }
 
 export default function AppShell({
+  sessionUser,
   initialUsers,
   initialTasks,
   initialLogs,
@@ -29,15 +35,13 @@ export default function AppShell({
 }: AppShellProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'MY_TASKS' | 'TEAM_VIEW' | 'SETTINGS'>('MY_TASKS');
-
-  const [currentUserId, setCurrentUserId] = useState<string>(
-    initialConfig?.defaultUserId || initialUsers[0]?.id || ''
-  );
+  const [currentUserId, setCurrentUserId] = useState<string>(sessionUser?.id || initialUsers[0]?.id || '');
+  const [isLoggingOut, startLogoutTransition] = useTransition();
 
   const currentUser =
-    initialUsers.find((u) => u.id === currentUserId) || initialUsers[0] || {
+    initialUsers.find((u) => u.id === currentUserId) || sessionUser || initialUsers[0] || {
       id: 'default',
-      name: 'Chathura (Lead)',
+      name: 'Chathura',
       email: 'chathura@example.com',
       role: 'LEAD',
     };
@@ -48,6 +52,12 @@ export default function AppShell({
 
   const handleRefresh = () => {
     router.refresh();
+  };
+
+  const handleLogout = () => {
+    startLogoutTransition(async () => {
+      await logoutAction();
+    });
   };
 
   return (
@@ -73,7 +83,10 @@ export default function AppShell({
           {/* Desktop Navigation Links */}
           <div className="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-2xl border border-slate-200/60 dark:border-slate-700/60">
             <button
-              onClick={() => setActiveTab('MY_TASKS')}
+              onClick={() => {
+                setCurrentUserId(sessionUser.id);
+                setActiveTab('MY_TASKS');
+              }}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all ${
                 activeTab === 'MY_TASKS'
                   ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
@@ -109,7 +122,7 @@ export default function AppShell({
             </button>
           </div>
 
-          {/* Right Header: Refresh and Active Profile */}
+          {/* Right Header: Refresh, User Profile & Logout */}
           <div className="flex items-center gap-2">
             <button
               onClick={handleRefresh}
@@ -119,7 +132,7 @@ export default function AppShell({
               <RefreshCw className="w-4 h-4" />
             </button>
 
-            {/* In Team View / Settings: show user switcher if needed, otherwise subtle profile pill */}
+            {/* In Team View / Settings: user switcher if lead */}
             {activeTab !== 'MY_TASKS' && initialUsers.length > 0 ? (
               <UserSwitcher
                 users={initialUsers}
@@ -128,12 +141,31 @@ export default function AppShell({
               />
             ) : (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold">
-                  {currentUser.name.charAt(0).toUpperCase()}
+                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-[10px] font-bold">
+                  {sessionUser.name.charAt(0).toUpperCase()}
                 </div>
-                <span className="hidden sm:inline">{currentUser.name}</span>
+                <span className="hidden sm:inline">{sessionUser.name}</span>
+                <span
+                  className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold uppercase ${
+                    sessionUser.role === 'LEAD'
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                      : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300'
+                  }`}
+                >
+                  {sessionUser.role}
+                </span>
               </div>
             )}
+
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="p-2 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+              title="Sign Out"
+            >
+              {isLoggingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+            </button>
           </div>
         </div>
       </header>
@@ -172,7 +204,10 @@ export default function AppShell({
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-lg border-t border-slate-200/80 dark:border-slate-800/80 safe-bottom shadow-lg">
         <div className="max-w-md mx-auto px-6 h-16 flex items-center justify-around">
           <button
-            onClick={() => setActiveTab('MY_TASKS')}
+            onClick={() => {
+              setCurrentUserId(sessionUser.id);
+              setActiveTab('MY_TASKS');
+            }}
             className={`flex flex-col items-center justify-center gap-1 transition-all py-1 px-4 rounded-2xl ${
               activeTab === 'MY_TASKS'
                 ? 'text-blue-600 dark:text-blue-400 font-bold scale-105'

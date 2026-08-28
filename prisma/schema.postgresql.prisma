@@ -11,6 +11,7 @@ model User {
   id        String               @id @default(cuid())
   name      String
   email     String               @unique
+  password  String?              // Optional hashed/plain password for team login
   role      String               @default("MEMBER") // LEAD, MEMBER
   avatar    String?
   isActive  Boolean              @default(true)
