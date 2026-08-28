@@ -19,10 +19,12 @@ import {
   Layers,
   CheckCheck,
   Check,
+  Users,
 } from 'lucide-react';
 import TaskCard from './TaskCard';
 import TaskModal from './TaskModal';
 import DailyLogModal from './DailyLogModal';
+import MeetingModal from './MeetingModal';
 import CompactTaskCreator from './CompactTaskCreator';
 import { triggerMorningReportAction, triggerEveningSummaryAction } from '@/lib/actions/config-actions';
 import { saveTodayShift, getTodayShift } from '@/lib/actions/shift-actions';
@@ -33,6 +35,7 @@ interface MyTasksTabProps {
   tasks: any[];
   logs: any[];
   config?: any;
+  initialMeetings?: any[];
 }
 
 export default function MyTasksTab({
@@ -41,12 +44,15 @@ export default function MyTasksTab({
   tasks,
   logs,
   config,
+  initialMeetings = [],
 }: MyTasksTabProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACTIVE' | 'DONE'>('ALL');
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
+  const [editingMeeting, setEditingMeeting] = useState<any>(null);
   const [isCompletedExpanded, setIsCompletedExpanded] = useState(true);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -462,6 +468,27 @@ export default function MyTasksTab({
               </button>
 
               <button
+                onClick={() => {
+                  setEditingMeeting(null);
+                  setIsMeetingModalOpen(true);
+                }}
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/40 dark:hover:bg-sky-950/60 border border-sky-200/80 dark:border-sky-900/50 text-sky-900 dark:text-sky-200 text-xs font-bold transition-all active:scale-98 shadow-sm"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-sky-600 text-white">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-bold">Log Meeting Period</div>
+                    <div className="text-[10px] font-normal text-sky-700 dark:text-sky-400">
+                      Record meeting start & end times
+                    </div>
+                  </div>
+                </div>
+                <Plus className="w-4 h-4 text-sky-600" />
+              </button>
+
+              <button
                 onClick={() => setIsLogModalOpen(true)}
                 className="w-full flex items-center justify-between p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold transition-all active:scale-98"
               >
@@ -501,6 +528,57 @@ export default function MyTasksTab({
                 <span>{totalCount - completedCount} In Progress</span>
               </div>
             </div>
+          </div>
+
+          {/* Today's Logged Meetings Card */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-sky-500" />
+                Today&apos;s Meetings ({initialMeetings.length})
+              </h4>
+              <button
+                onClick={() => {
+                  setEditingMeeting(null);
+                  setIsMeetingModalOpen(true);
+                }}
+                className="text-xs font-semibold text-blue-600 hover:underline"
+              >
+                + Log Meeting
+              </button>
+            </div>
+
+            {initialMeetings.length > 0 ? (
+              <div className="space-y-2">
+                {initialMeetings.map((m) => (
+                  <div
+                    key={m.id}
+                    onClick={() => {
+                      setEditingMeeting(m);
+                      setIsMeetingModalOpen(true);
+                    }}
+                    className="p-3 rounded-2xl bg-sky-50/50 dark:bg-sky-950/20 border border-sky-100 dark:border-sky-900/40 text-xs space-y-1 cursor-pointer hover:border-sky-300 transition-colors"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-slate-900 dark:text-slate-100 truncate flex-1">
+                        {m.title}
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-sky-100 dark:bg-sky-900/60 text-sky-800 dark:text-sky-300 shrink-0">
+                        <Clock className="w-2.5 h-2.5" />
+                        {m.startTime} - {m.endTime}
+                      </span>
+                    </div>
+                    {m.description && (
+                      <p className="text-[11px] text-slate-500 line-clamp-1">{m.description}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic">
+                No meetings logged for today yet.
+              </p>
+            )}
           </div>
 
           {/* Daily Work Notes Preview Card */}
@@ -573,6 +651,14 @@ export default function MyTasksTab({
         onClose={() => setIsLogModalOpen(false)}
         userId={currentUser.id}
         userName={currentUser.name}
+      />
+
+      {/* Meeting Logging Modal */}
+      <MeetingModal
+        isOpen={isMeetingModalOpen}
+        onClose={() => setIsMeetingModalOpen(false)}
+        userId={currentUser.id}
+        editingMeeting={editingMeeting}
       />
     </div>
   );

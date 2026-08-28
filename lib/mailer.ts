@@ -1,97 +1,79 @@
 import nodemailer from 'nodemailer';
 import { prisma } from './prisma';
-import { processRecurringTasks } from './recurrence';
 
-export interface EmailSendResult {
-  success: boolean;
-  message: string;
-  messageId?: string;
-  taskCount?: number;
-  recipientCount?: number;
+/**
+ * Normalizes recipient list string for accurate comparison
+ */
+function normalizeRecipients(recipients?: string | null): string {
+  if (!recipients) return '';
+  return recipients
+    .split(',')
+    .map((r) => r.trim().toLowerCase())
+    .filter(Boolean)
+    .sort()
+    .join(', ');
 }
 
 /**
- * Creates Nodemailer transporter using dynamic database settings or overrides.
+ * Validates and initializes the Nodemailer SMTP Transporter
  */
-export async function getTransporter(customConfig?: {
-  smtpHost?: string;
-  smtpPort?: number;
-  smtpSecure?: boolean;
-  smtpUser?: string;
-  smtpPassword?: string;
-}) {
-  const config =
-    customConfig ||
-    (await prisma.appConfig.findUnique({
-      where: { id: 'global_config' },
-    }));
+export async function getTransporter() {
+  const config = await prisma.appConfig.findUnique({
+    where: { id: 'global_config' },
+  });
 
-  if (!config || !config.smtpUser || !config.smtpPassword) {
+  if (!config) {
+    throw new Error('Application email settings have not been configured yet.');
+  }
+
+  if (!config.smtpHost || !config.smtpUser || !config.smtpPassword) {
     throw new Error(
-      'SMTP is not configured. Please enter your Gmail/SMTP email and App Password in Settings.'
+      'Incomplete SMTP credentials. Please configure SMTP Host, User, and App Password in Settings.'
     );
   }
 
   const port = Number(config.smtpPort) || 465;
-  const isSecure = config.smtpSecure !== undefined ? Boolean(config.smtpSecure) : port === 465;
+  const isSecure = config.smtpSecure ?? (port === 465);
 
-  return nodemailer.createTransport({
-    host: config.smtpHost || 'smtp.gmail.com',
+  const transporter = nodemailer.createTransport({
+    host: config.smtpHost.trim(),
     port: port,
     secure: isSecure,
     auth: {
       user: config.smtpUser.trim(),
-      pass: config.smtpPassword.trim(),
+      pass: config.smtpPassword.replace(/\s+/g, ''),
     },
-    tls: {
-      rejectUnauthorized: false,
-    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
+
+  return transporter;
 }
 
 /**
- * Verifies SMTP connection and authentication.
+ * Resolves To, CC, and BCC recipient arrays from configuration
  */
-export async function verifySmtpConnection(customConfig?: {
-  smtpHost?: string;
-  smtpPort?: number;
-  smtpSecure?: boolean;
-  smtpUser?: string;
-  smtpPassword?: string;
-}): Promise<{ success: boolean; message: string }> {
-  try {
-    const transporter = await getTransporter(customConfig);
-    await transporter.verify();
-    return { success: true, message: 'SMTP connection verified successfully!' };
-  } catch (error: any) {
-    console.error('SMTP Verification Error:', error);
-    return {
-      success: false,
-      message:
-        error.message ||
-        'Failed to authenticate with SMTP server. Please check your credentials.',
-    };
-  }
-}
-
-/**
- * Resolves To, CC, and BCC recipient lists from config or overrides.
- */
-function resolveRecipients(config: any, recipientOverride?: string) {
+export function resolveRecipients(config: any): {
+  toList: string[];
+  ccList: string[];
+  bccList: string[];
+} {
   let toList: string[] = [];
   let ccList: string[] = [];
   let bccList: string[] = [];
 
-  if (recipientOverride && recipientOverride.trim()) {
-    toList = recipientOverride.split(',').map((r) => r.trim()).filter(Boolean);
-  } else {
+  if (config) {
     const rawTo = config.toRecipients || config.emailRecipients || '';
-    toList = rawTo.split(',').map((r: string) => r.trim()).filter(Boolean);
+    if (rawTo && typeof rawTo === 'string') {
+      toList = rawTo.split(',').map((r: string) => r.trim()).filter(Boolean);
+    }
 
-    if (config.ccRecipients) {
+    if (config.ccRecipients && typeof config.ccRecipients === 'string') {
       ccList = config.ccRecipients.split(',').map((r: string) => r.trim()).filter(Boolean);
     }
-    if (config.bccRecipients) {
+
+    if (config.bccRecipients && typeof config.bccRecipients === 'string') {
       bccList = config.bccRecipients.split(',').map((r: string) => r.trim()).filter(Boolean);
     }
   }
@@ -101,8 +83,13 @@ function resolveRecipients(config: any, recipientOverride?: string) {
 
 /**
  * Retrieves or initializes monthly email thread metadata for threading replies.
+ * If the primary "To" recipient list has changed, starts a new clean conversation.
  */
-async function getMonthlyThreadDetails(userId: string, targetDate: Date = new Date()) {
+async function getMonthlyThreadDetails(
+  userId: string,
+  targetDate: Date = new Date(),
+  currentToRecipients: string = ''
+) {
   const year = targetDate.getFullYear();
   const month = String(targetDate.getMonth() + 1).padStart(2, '0');
   const monthKey = `${year}-${month}`; // e.g. "2026-08"
@@ -122,6 +109,21 @@ async function getMonthlyThreadDetails(userId: string, targetDate: Date = new Da
     },
   });
 
+  // If primary To recipients changed, do not reply into old thread -> start new conversation
+  if (existingThread && existingThread.toRecipients) {
+    const normOld = normalizeRecipients(existingThread.toRecipients);
+    const normNew = normalizeRecipients(currentToRecipients);
+
+    if (normOld && normNew && normOld !== normNew) {
+      return {
+        monthKey,
+        monthName,
+        baseSubject,
+        existingThread: null, // Reset to start new thread
+      };
+    }
+  }
+
   return {
     monthKey,
     monthName,
@@ -137,9 +139,12 @@ async function saveMonthlyThreadMessage(
   userId: string,
   monthKey: string,
   baseSubject: string,
-  messageId: string
+  messageId: string,
+  currentToRecipients: string = ''
 ) {
   if (!messageId) return;
+
+  const normalizedTo = normalizeRecipients(currentToRecipients);
 
   const existing = await prisma.monthlyEmailThread.findUnique({
     where: {
@@ -151,9 +156,16 @@ async function saveMonthlyThreadMessage(
   });
 
   if (existing) {
+    const normOld = normalizeRecipients(existing.toRecipients);
+    const isRecipientChanged = normOld && normalizedTo && normOld !== normalizedTo;
+
     await prisma.monthlyEmailThread.update({
       where: { id: existing.id },
-      data: { lastMessageId: messageId },
+      data: {
+        lastMessageId: messageId,
+        toRecipients: normalizedTo,
+        ...(isRecipientChanged ? { rootMessageId: messageId } : {}),
+      },
     });
   } else {
     await prisma.monthlyEmailThread.create({
@@ -163,18 +175,20 @@ async function saveMonthlyThreadMessage(
         rootMessageId: messageId,
         lastMessageId: messageId,
         subject: baseSubject,
+        toRecipients: normalizedTo,
       },
     });
   }
 }
 
 /**
- * Generates the pixel-perfect HTML table matching the user's template.
- * @param mode 'morning' (Day Plan - no start/end times) | 'evening' (Task Log - with start/end times)
+ * Generates the HTML report table matching the user's template.
+ * @param mode 'morning' (Day Plan) | 'evening' (Task Log with times, productivity, blockers & meetings)
  */
 function buildReportTableHtml(options: {
   user: { name: string; email: string };
   tasks: any[];
+  meetings?: any[];
   config: any;
   mode: 'morning' | 'evening';
   targetDate?: Date;
@@ -184,7 +198,7 @@ function buildReportTableHtml(options: {
     shiftEndTime?: string | null;
   };
 }) {
-  const { user, tasks, config, mode, targetDate = new Date(), customShift } = options;
+  const { user, tasks, meetings = [], config, mode, targetDate = new Date(), customShift } = options;
   const isMorning = mode === 'morning';
   const planTitle = isMorning ? 'Day Plan' : 'Task Log';
 
@@ -203,11 +217,12 @@ function buildReportTableHtml(options: {
   const prepEnd = customShift?.prepEndTime || config?.prepEndTime || '8.45';
   const shiftEnd = customShift?.shiftEndTime || defaultShiftEnd;
 
-  // Calculate Overall Productivity Ratio
-  const totalTasks = tasks.length;
-  const totalProgressSum = tasks.reduce((sum, t) => sum + (t.progress || 0), 0);
+  // Calculate Overall Productivity Ratio (tasks + meetings)
+  const totalItems = tasks.length + meetings.length;
+  const totalProgressSum =
+    tasks.reduce((sum, t) => sum + (t.progress || 0), 0) + meetings.length * 100;
   const overallProductivity =
-    totalTasks > 0 ? (totalProgressSum / totalTasks).toFixed(2) : '0.00';
+    totalItems > 0 ? (totalProgressSum / totalItems).toFixed(2) : '0.00';
 
   const getPriorityStyle = (priority: string = 'High') => {
     const p = priority.toLowerCase();
@@ -247,15 +262,18 @@ function buildReportTableHtml(options: {
   const cellBorder = 'border: 1px solid #000000; padding: 6px 8px; font-size: 13px;';
 
   const renderTaskRows = () => {
-    if (tasks.length === 0) {
+    let rowsHtml = '';
+
+    if (tasks.length === 0 && meetings.length === 0) {
       return `
         <tr>
-          <td style="${cellBorder} text-align: center;" colspan="7">No tasks recorded for this plan.</td>
+          <td style="${cellBorder} text-align: center;" colspan="7">No tasks or meetings recorded for this plan.</td>
         </tr>
       `;
     }
 
-    return tasks
+    // Render Tasks
+    rowsHtml += tasks
       .map((t) => {
         const startVal = isMorning ? '' : t.startTime || '';
         const endVal = isMorning ? '' : t.endTime || '';
@@ -291,6 +309,36 @@ function buildReportTableHtml(options: {
         `;
       })
       .join('');
+
+    // Render Logged Meetings (with exact start/end times and 100% completion)
+    if (meetings && meetings.length > 0) {
+      rowsHtml += meetings
+        .map((m) => {
+          const startVal = isMorning ? '' : m.startTime || '';
+          const endVal = isMorning ? '' : m.endTime || '';
+          return `
+            <tr style="background-color: #fafafa;">
+              <td style="${cellBorder} text-align: right; width: 68px;">${startVal}</td>
+              <td style="${cellBorder} text-align: right; width: 68px;">${endVal}</td>
+              <td style="${cellBorder} text-align: left;">
+                <strong>[Meeting]</strong> ${m.title}
+                ${
+                  m.description
+                    ? `<div style="font-size: 11px; color: #666; margin-top: 2px;">${m.description}</div>`
+                    : ''
+                }
+              </td>
+              <td style="${cellBorder} text-align: center; color: #38bdf8; font-weight: 500; width: 95px;">Meeting</td>
+              <td style="${cellBorder} text-align: center; color: #047857; font-weight: bold; width: 95px;">Team</td>
+              <td style="${cellBorder} text-align: center; color: #047857; font-weight: 500; width: 95px;">Completed</td>
+              <td style="${cellBorder} text-align: right; width: 100px;">100.00%</td>
+            </tr>
+          `;
+        })
+        .join('');
+    }
+
+    return rowsHtml;
   };
 
   return `
@@ -327,7 +375,7 @@ function buildReportTableHtml(options: {
           </tr>
 
           <tr style="font-weight: bold; background-color: #ffffff;">
-            <td colspan="3" style="${cellBorder} text-align: center;">Tasks to be complete</td>
+            <td colspan="3" style="${cellBorder} text-align: center;">Tasks & Meetings to be complete</td>
             <td style="${cellBorder} text-align: center; width: 95px;">Priority Level</td>
             <td style="${cellBorder} text-align: center; width: 95px;">Assigned by</td>
             <td style="${cellBorder} text-align: center; width: 95px;">Task Status</td>
@@ -339,16 +387,18 @@ function buildReportTableHtml(options: {
           <tr>
             <td style="${cellBorder}"></td>
             <td style="${cellBorder} text-align: right;">${isMorning ? '' : shiftEnd}</td>
-            <td colspan="5" style="${cellBorder}">
-              Shift off
+            <td colspan="5" style="${cellBorder} background-color: #999999; color: #000000; text-align: center; font-weight: 500;">
+              Shift End & Sign Out
             </td>
           </tr>
 
           <tr>
-            <td colspan="6" style="${cellBorder} text-align: right; font-weight: bold; font-size: 14px; padding-right: 14px;">
-              Overall Productivity Ratio of the Day (${user.name || 'Myself'})
+            <td style="${cellBorder}"></td>
+            <td style="${cellBorder}"></td>
+            <td colspan="4" style="${cellBorder} font-weight: bold; text-align: right;">
+              Overall Productivity Ratio
             </td>
-            <td style="${cellBorder} background-color: #c4c4c4; text-align: center; font-weight: bold; font-size: 14px;">
+            <td style="${cellBorder} font-weight: bold; text-align: right;">
               ${overallProductivity}%
             </td>
           </tr>
@@ -359,114 +409,94 @@ function buildReportTableHtml(options: {
 }
 
 /**
- * Sends a test email to verify credentials and inbox delivery.
+ * Tests SMTP connection
  */
-export async function sendTestEmail(targetEmail: string): Promise<EmailSendResult> {
+export async function testSmtpConnection(customConfig?: any) {
   try {
-    const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
-    if (!config) throw new Error('Global configuration not found.');
+    let transporter: nodemailer.Transporter;
 
-    const transporter = await getTransporter();
-    const { toList } = resolveRecipients(config, targetEmail);
-
-    if (toList.length === 0) {
-      throw new Error('Please provide a recipient email address.');
+    if (customConfig && customConfig.smtpHost) {
+      const port = Number(customConfig.smtpPort) || 465;
+      const isSecure = customConfig.smtpSecure ?? (port === 465);
+      transporter = nodemailer.createTransport({
+        host: customConfig.smtpHost.trim(),
+        port: port,
+        secure: isSecure,
+        auth: {
+          user: customConfig.smtpUser?.trim(),
+          pass: customConfig.smtpPassword?.replace(/\s+/g, ''),
+        },
+        connectionTimeout: 8000,
+      });
+    } else {
+      transporter = await getTransporter();
     }
 
-    const testUser = { name: 'Myself', email: config.smtpUser };
-    const sampleTasks = [
-      {
-        title: 'Check sales details and update records',
-        startTime: '8.45',
-        endTime: '9.00',
-        priority: 'High',
-        assignedBy: 'Altitude1',
-        status: 'DONE',
-        progress: 100,
-      },
-      {
-        title: 'Webmail creation as per team request',
-        startTime: '9.00',
-        endTime: '5.30',
-        priority: 'Medium',
-        assignedBy: 'Altitude1',
-        status: 'DONE',
-        progress: 100,
-      },
-    ];
-
-    const testHtml = `
-      <div style="font-family: Arial, sans-serif; padding: 10px;">
-        <p style="font-size: 14px; color: #333; margin-bottom: 16px;">
-          <strong>SMTP Connection Test</strong> — Below is a live preview of your report layout:
-        </p>
-        ${buildReportTableHtml({
-          user: testUser,
-          tasks: sampleTasks,
-          config,
-          mode: 'evening',
-        })}
-      </div>
-    `;
-
-    const info = await transporter.sendMail({
-      from: `"${config.senderName || 'Daily Focus & Team Tracker'}" <${config.smtpUser}>`,
-      to: toList.join(', '),
-      subject: `Test Report Preview - ${new Date().toLocaleDateString()}`,
-      html: testHtml,
-    });
-
-    return {
-      success: true,
-      message: `Test email sent successfully to ${toList.join(', ')}!`,
-      messageId: info.messageId,
-    };
+    await transporter.verify();
+    return { success: true, message: 'SMTP server connection verified successfully.' };
   } catch (error: any) {
-    console.error('Send Test Email Error:', error);
     return {
       success: false,
-      message: error.message || 'Failed to send test email.',
+      message: error.message || 'Failed to authenticate with SMTP server.',
     };
   }
 }
 
 /**
- * 1. Morning Day Plan Trigger (Personal)
- * Configurable To, CC, and BCC recipients.
- * Sends as a reply within the current month's conversation thread.
+ * Sends a test email
  */
-export async function sendMorningTodoList(
-  userId?: string,
-  recipientOverride?: string,
-  customCheckInTime?: string
-): Promise<EmailSendResult> {
+export async function sendTestEmail(targetEmail: string) {
   try {
     const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
-    if (!config) throw new Error('Global configuration not found.');
+    if (!config) throw new Error('Settings not configured.');
 
-    const { toList, ccList, bccList } = resolveRecipients(config, recipientOverride);
+    const transporter = await getTransporter();
 
-    if (toList.length === 0 && ccList.length === 0 && bccList.length === 0) {
-      throw new Error('No recipient email addresses configured (To, CC, BCC). Please add them in Settings.');
+    const info = await transporter.sendMail({
+      from: `"${config.senderName || 'Daily Focus'}" <${config.smtpUser}>`,
+      to: targetEmail,
+      subject: `Test Email Connection - ${new Date().toLocaleTimeString()}`,
+      text: 'SMTP credentials verified successfully.',
+      html: `<div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2 style="color: #2563eb;">Email Connection Verified</h2>
+        <p>Your SMTP credentials and recipient configurations are functioning properly.</p>
+        <p style="color: #64748b; font-size: 12px;">Sent at: ${new Date().toLocaleString()}</p>
+      </div>`,
+    });
+
+    return { success: true, message: `Test email delivered to ${targetEmail} (ID: ${info.messageId})` };
+  } catch (error: any) {
+    return { success: false, message: error.message || 'Failed to send test email.' };
+  }
+}
+
+/**
+ * Sends Morning "Day Plan" Email
+ */
+export async function sendMorningReportEmail(userId?: string, customCheckInTime?: string) {
+  try {
+    const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
+    if (!config) throw new Error('Settings not configured.');
+
+    const { toList, ccList, bccList } = resolveRecipients(config);
+
+    if (toList.length === 0) {
+      throw new Error('No recipient email address found in settings.');
     }
 
-    await processRecurringTasks(userId);
-
-    let targetUser;
+    let targetUser = null;
     if (userId) {
       targetUser = await prisma.user.findUnique({ where: { id: userId } });
-    } else if (config.defaultUserId) {
-      targetUser = await prisma.user.findUnique({ where: { id: config.defaultUserId } });
-    } else {
-      targetUser = await prisma.user.findFirst({ where: { role: 'LEAD', isActive: true } });
+    }
+    if (!targetUser) {
+      targetUser = await prisma.user.findFirst({
+        where: { isActive: true },
+        orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+      });
     }
 
     if (!targetUser) {
-      targetUser = await prisma.user.findFirst({ where: { isActive: true } });
-    }
-
-    if (!targetUser) {
-      throw new Error('No active user found to generate morning report for.');
+      throw new Error('No active user found to send report for.');
     }
 
     const todayStart = new Date();
@@ -474,21 +504,17 @@ export async function sendMorningTodoList(
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999);
 
-    let shift = await prisma.dailyShift.findFirst({
-      where: {
-        userId: targetUser.id,
-        date: { gte: todayStart, lte: todayEnd },
-      },
-    });
-
     if (customCheckInTime && customCheckInTime.trim()) {
-      if (shift) {
-        shift = await prisma.dailyShift.update({
-          where: { id: shift.id },
+      const existing = await prisma.dailyShift.findFirst({
+        where: { userId: targetUser.id, date: { gte: todayStart, lte: todayEnd } },
+      });
+      if (existing) {
+        await prisma.dailyShift.update({
+          where: { id: existing.id },
           data: { shiftStartTime: customCheckInTime.trim() },
         });
       } else {
-        shift = await prisma.dailyShift.create({
+        await prisma.dailyShift.create({
           data: {
             userId: targetUser.id,
             date: todayStart,
@@ -497,6 +523,10 @@ export async function sendMorningTodoList(
         });
       }
     }
+
+    const shift = await prisma.dailyShift.findFirst({
+      where: { userId: targetUser.id, date: { gte: todayStart, lte: todayEnd } },
+    });
 
     const tasks = await prisma.task.findMany({
       where: {
@@ -515,16 +545,26 @@ export async function sendMorningTodoList(
       orderBy: [{ createdAt: 'asc' }],
     });
 
+    const meetings = await prisma.meetingLog.findMany({
+      where: {
+        userId: targetUser.id,
+        date: { gte: todayStart, lte: todayEnd },
+      },
+      orderBy: { startTime: 'asc' },
+    });
+
     const transporter = await getTransporter();
 
     const { monthKey, baseSubject, existingThread } = await getMonthlyThreadDetails(
       targetUser.id,
-      todayStart
+      todayStart,
+      toList.join(', ')
     );
 
     const emailHtml = buildReportTableHtml({
       user: targetUser,
       tasks,
+      meetings,
       config,
       mode: 'morning',
       targetDate: todayStart,
@@ -559,55 +599,47 @@ export async function sendMorningTodoList(
 
     const info = await transporter.sendMail(mailOptions);
 
-    await saveMonthlyThreadMessage(targetUser.id, monthKey, baseSubject, info.messageId);
-
-    const allRecipients = [...toList, ...ccList, ...bccList];
+    await saveMonthlyThreadMessage(
+      targetUser.id,
+      monthKey,
+      baseSubject,
+      info.messageId,
+      toList.join(', ')
+    );
 
     return {
       success: true,
-      message: `Morning Day Plan successfully sent to ${toList.join(', ')}${ccList.length > 0 ? ` (CC: ${ccList.join(', ')})` : ''}${bccList.length > 0 ? ` (BCC: ${bccList.length})` : ''}!`,
-      messageId: info.messageId,
-      taskCount: tasks.length,
-      recipientCount: allRecipients.length,
+      message: `Day Plan email sent to ${toList.join(', ')} (Message ID: ${info.messageId})`,
     };
   } catch (error: any) {
-    console.error('Send Morning List Error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to send morning to-do list.',
-    };
+    return { success: false, message: error.message || 'Failed to dispatch Day Plan email.' };
   }
 }
 
 /**
- * 2. Evening Task Log Trigger (Personal)
- * Configurable To, CC, and BCC recipients.
- * Sends as a reply within the current month's conversation thread.
+ * Sends Evening "Task Log" Email
  */
-export async function sendDailySummaryReport(
-  recipientOverride?: string,
+export async function sendEveningSummaryEmail(
+  targetDate: Date = new Date(),
   targetUserId?: string,
   customCheckOutTime?: string
-): Promise<EmailSendResult> {
+) {
   try {
     const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
-    if (!config) throw new Error('Global configuration not found.');
+    if (!config) throw new Error('Settings not configured.');
 
-    const { toList, ccList, bccList } = resolveRecipients(config, recipientOverride);
+    const { toList, ccList, bccList } = resolveRecipients(config);
 
-    if (toList.length === 0 && ccList.length === 0 && bccList.length === 0) {
-      throw new Error('No recipient email addresses configured (To, CC, BCC). Please add them in Settings.');
+    if (toList.length === 0) {
+      throw new Error('No recipient email address configured.');
     }
 
-    const todayStart = new Date();
+    const todayStart = new Date(targetDate);
     todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
+    const todayEnd = new Date(targetDate);
     todayEnd.setHours(23, 59, 59, 999);
 
-    const userWhere: any = { isActive: true };
-    if (targetUserId) {
-      userWhere.id = targetUserId;
-    }
+    const userWhere = targetUserId ? { id: targetUserId, isActive: true } : { isActive: true };
 
     const users = await prisma.user.findMany({
       where: userWhere,
@@ -615,9 +647,9 @@ export async function sendDailySummaryReport(
         tasks: {
           where: {
             OR: [
-              { updatedAt: { gte: todayStart } },
-              { createdAt: { gte: todayStart } },
-              { status: { in: ['TODO', 'IN_PROGRESS'] } },
+              { createdAt: { gte: todayStart, lte: todayEnd } },
+              { updatedAt: { gte: todayStart, lte: todayEnd } },
+              { status: { in: ['TODO', 'IN_PROGRESS', 'DONE'] } },
             ],
           },
           include: {
@@ -625,7 +657,13 @@ export async function sendDailySummaryReport(
               orderBy: { createdAt: 'asc' },
             },
           },
-          orderBy: [{ createdAt: 'asc' }],
+          orderBy: { createdAt: 'asc' },
+        },
+        meetings: {
+          where: {
+            date: { gte: todayStart, lte: todayEnd },
+          },
+          orderBy: { startTime: 'asc' },
         },
         shifts: {
           where: {
@@ -633,7 +671,7 @@ export async function sendDailySummaryReport(
           },
         },
       },
-      orderBy: [{ role: 'asc' }, { name: 'asc' }],
+      orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
     });
 
     if (users.length === 0) {
@@ -669,14 +707,15 @@ export async function sendDailySummaryReport(
 
     const { monthKey, baseSubject, existingThread } = await getMonthlyThreadDetails(
       primaryUser.id,
-      todayStart
+      todayStart,
+      toList.join(', ')
     );
 
     let combinedHtml = '';
     let totalTasksCount = 0;
 
     for (const u of users) {
-      totalTasksCount += u.tasks.length;
+      totalTasksCount += u.tasks.length + (u.meetings?.length || 0);
       const userShift = u.shifts[0] || null;
       const finalShiftEnd =
         (u.id === targetUserId && customCheckOutTime?.trim()) ||
@@ -686,6 +725,7 @@ export async function sendDailySummaryReport(
       combinedHtml += buildReportTableHtml({
         user: u,
         tasks: u.tasks,
+        meetings: u.meetings || [],
         config,
         mode: 'evening',
         targetDate: todayStart,
@@ -720,22 +760,25 @@ export async function sendDailySummaryReport(
 
     const info = await transporter.sendMail(mailOptions);
 
-    await saveMonthlyThreadMessage(primaryUser.id, monthKey, baseSubject, info.messageId);
-
-    const allRecipients = [...toList, ...ccList, ...bccList];
+    await saveMonthlyThreadMessage(
+      primaryUser.id,
+      monthKey,
+      baseSubject,
+      info.messageId,
+      toList.join(', ')
+    );
 
     return {
       success: true,
-      message: `Task log successfully sent to ${toList.join(', ')}${ccList.length > 0 ? ` (CC: ${ccList.join(', ')})` : ''}${bccList.length > 0 ? ` (BCC: ${bccList.length})` : ''}!`,
-      messageId: info.messageId,
-      taskCount: totalTasksCount,
-      recipientCount: allRecipients.length,
+      message: `Task Log summary email sent to ${toList.join(', ')} (Message ID: ${info.messageId})`,
     };
   } catch (error: any) {
-    console.error('Send Daily Summary Error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to send task log.',
-    };
+    return { success: false, message: error.message || 'Failed to dispatch Task Log email.' };
   }
 }
+
+// Backward compatibility export aliases
+export const verifySmtpConnection = testSmtpConnection;
+export const sendMorningTodoList = sendMorningReportEmail;
+export const sendDailySummaryReport = sendEveningSummaryEmail;
+

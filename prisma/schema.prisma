@@ -18,6 +18,7 @@ model User {
   tasks     Task[]
   logs      DailyLog[]
   shifts    DailyShift[]
+  meetings  MeetingLog[]
   threads   MonthlyEmailThread[]
   createdAt DateTime             @default(now())
   updatedAt DateTime             @updatedAt
@@ -78,11 +79,25 @@ model DailyShift {
   @@unique([userId, date])
 }
 
+model MeetingLog {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  startTime   String   // e.g. "10.30"
+  endTime     String   // e.g. "11.15"
+  date        DateTime @default(now())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model MonthlyEmailThread {
   id            String   @id @default(cuid())
   userId        String
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   monthKey      String   // e.g. "2026-08"
+  toRecipients  String?  // Recipient list when thread was started
   rootMessageId String   // The Message-ID of the first email of the month
   lastMessageId String?  // The Message-ID of the latest email
   subject       String   // The base subject of the thread

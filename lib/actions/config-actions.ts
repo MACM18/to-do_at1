@@ -5,8 +5,8 @@ import { prisma } from '../prisma';
 import {
   verifySmtpConnection,
   sendTestEmail,
-  sendMorningTodoList,
-  sendDailySummaryReport,
+  sendMorningReportEmail,
+  sendEveningSummaryEmail,
 } from '../mailer';
 import { initScheduler } from '../scheduler';
 
@@ -131,13 +131,16 @@ export async function triggerMorningReportAction(
   recipientOverride?: string,
   customCheckInTime?: string
 ) {
-  return sendMorningTodoList(userId, recipientOverride, customCheckInTime);
+  // Support both (userId, recipientOverride, customCheckInTime) and (userId, customCheckInTime)
+  const checkIn = customCheckInTime || (recipientOverride && !recipientOverride.includes('@') ? recipientOverride : undefined);
+  return sendMorningReportEmail(userId, checkIn);
 }
 
 export async function triggerEveningSummaryAction(
-  recipientOverride?: string,
+  userIdOrRecipient?: string,
   userId?: string,
   customCheckOutTime?: string
 ) {
-  return sendDailySummaryReport(recipientOverride, userId, customCheckOutTime);
+  const targetId = userId || (userIdOrRecipient && !userIdOrRecipient.includes('@') ? userIdOrRecipient : undefined);
+  return sendEveningSummaryEmail(new Date(), targetId, customCheckOutTime);
 }

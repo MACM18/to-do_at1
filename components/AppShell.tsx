@@ -24,6 +24,7 @@ interface AppShellProps {
   initialTasks: any[];
   initialLogs: any[];
   initialConfig: any;
+  initialMeetings?: any[];
 }
 
 export default function AppShell({
@@ -32,6 +33,7 @@ export default function AppShell({
   initialTasks,
   initialLogs,
   initialConfig,
+  initialMeetings = [],
 }: AppShellProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'MY_TASKS' | 'TEAM_VIEW' | 'SETTINGS'>('MY_TASKS');
@@ -179,6 +181,7 @@ export default function AppShell({
             tasks={initialTasks}
             logs={initialLogs}
             config={initialConfig}
+            initialMeetings={initialMeetings}
           />
         )}
 
