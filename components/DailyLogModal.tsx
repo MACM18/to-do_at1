@@ -40,19 +40,19 @@ export default function DailyLogModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2">
-            <span className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400">
+            <span className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
               <BookOpen className="w-5 h-5" />
             </span>
             <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
                 Write Daily Log & Notes
               </h2>
-              <p className="text-xs text-slate-500">For {userName} • Will be included in team reports</p>
+              <p className="text-xs text-slate-500">For {userName} • Included in evening team reports</p>
             </div>
           </div>
           <button
@@ -67,28 +67,28 @@ export default function DailyLogModal({
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Today's Key Accomplishments & Summary *
+              Today&apos;s Work Summary & Key Accomplishments *
             </label>
             <textarea
               required
               rows={4}
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
-              placeholder="What did you complete or work on today? e.g., Finished PWA mobile responsive views, configured SMTP background scheduler..."
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="What did you complete or work on today? e.g., Webmail creation, backend API endpoints, KPI update..."
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> Any Blockers / Help Needed? (Optional)
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> Any Blockers / Issues Encountered (Optional)
             </label>
             <textarea
               rows={2}
               value={blockers}
               onChange={(e) => setBlockers(e.target.value)}
-              placeholder="e.g., Awaiting review on PR #12 or SMTP Google App Password permissions..."
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              placeholder="e.g., Waiting for DNS propagation or staging environment access..."
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
           </div>
 
@@ -103,10 +103,10 @@ export default function DailyLogModal({
             <button
               type="submit"
               disabled={isPending || !summary.trim()}
-              className="px-5 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-xl transition-all shadow-md shadow-purple-500/20 active:scale-95 flex items-center gap-1.5"
+              className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl transition-all shadow-md shadow-blue-500/20 active:scale-95 flex items-center gap-1.5"
             >
               <Send className="w-3.5 h-3.5" />
-              {isPending ? 'Saving...' : 'Save Daily Log'}
+              {isPending ? 'Saving...' : 'Save Log'}
             </button>
           </div>
         </form>

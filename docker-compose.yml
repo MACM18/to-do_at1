@@ -3,12 +3,37 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: daily-task-tracker
+    # When deployed via GHCR, you can replace 'build' with 'image: ghcr.io/<owner>/to-do_at1:latest'
+    container_name: daily-task-app
     restart: always
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=file:/app/prisma/dev.db
+      - DATABASE_URL=postgresql://postgres:daily_secure_pass123@postgres:5432/daily_focus?schema=public
       - NODE_ENV=production
+      - PORT=3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: daily-task-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: daily_secure_pass123
+      POSTGRES_DB: daily_focus
     volumes:
-      - ./prisma/data:/app/prisma
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d daily_focus"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local

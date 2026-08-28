@@ -94,7 +94,6 @@ export async function updateConfig(data: {
     },
   });
 
-  // Re-sync background scheduler
   await initScheduler();
 
   revalidatePath('/');
@@ -115,10 +114,18 @@ export async function sendTestEmailAction(email: string) {
   return sendTestEmail(email);
 }
 
-export async function triggerMorningReportAction(userId?: string, recipientOverride?: string) {
-  return sendMorningTodoList(userId, recipientOverride);
+export async function triggerMorningReportAction(
+  userId?: string,
+  recipientOverride?: string,
+  customCheckInTime?: string
+) {
+  return sendMorningTodoList(userId, recipientOverride, customCheckInTime);
 }
 
-export async function triggerEveningSummaryAction(recipientOverride?: string, userId?: string) {
-  return sendDailySummaryReport(recipientOverride, userId);
+export async function triggerEveningSummaryAction(
+  recipientOverride?: string,
+  userId?: string,
+  customCheckOutTime?: string
+) {
+  return sendDailySummaryReport(recipientOverride, userId, customCheckOutTime);
 }

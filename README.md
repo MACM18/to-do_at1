@@ -1,111 +1,59 @@
 # 📋 Daily Task & Team Monitoring PWA
 
-A modern, mobile-first Progressive Web App (PWA) built for iPhone, Mac, and small VPS hosting. Manage personal work focus, track team deliverables, record daily logs & blockers, and automatically send rich HTML Gmail reports every morning and evening.
+A mobile-first Progressive Web App (PWA) with a 2-column desktop experience, designed for iPhone, Mac, and small VPS hosting. Manage personal work focus, track team deliverables, record daily logs & blockers, and automatically send tabular Gmail reports every morning and evening.
 
 ---
 
 ## ✨ Features
 
-- **📱 Mobile-First PWA (iOS & Mac Ready)**:
-  - Add to Home Screen on iPhone & Safari for a standalone app experience.
-  - Safe-area insets, smooth gestures, and high-contrast responsive dark/light theme.
-  - 3-Tab intuitive bottom navigation: **My Tasks**, **Team View**, and **Settings**.
+- **📱 Mobile-First & 🖥️ 2-Column Desktop Experience**:
+  - **My Tasks**: 2-column view with quick-tag task creator, active tasks, carry-over backlog, compacted completed tasks, and fast email triggers sidebar.
+  - **Team View**: 2-column monitor with member cards, direct task assigner, and live completion rate metrics.
+  - **Settings Hub**: 2-column configuration with Gmail SMTP, shift timings, recipient lists, employee management, and live test diagnostics.
+  - Full PWA with iOS "Add to Home Screen" standalone app support.
 
 - **🎯 Personal Daily Focus & Smart Progress Calculation**:
-  - **Single-click 0% $\leftrightarrow$ 100% toggle** for tasks without subtasks (with celebratory confetti).
-  - **Weighted Subtask Progress**: $(\text{Done Subtasks} / \text{Total Subtasks}) \times 100\%$, with automatic status transitions (`TODO` $\rightarrow$ `IN_PROGRESS` $\rightarrow$ `DONE`).
-  - **Pending Carry-over Backlog**: Tasks from past dates remain flagged as backlog until resolved.
-  - **Recurring Schedules**: Set tasks to renew `DAILY` or `WEEKLY`.
+  - **0% $\leftrightarrow$ 100% toggle** for single-click task completion.
+  - **Weighted Subtask Computation**: Dynamically calculates progress percentage as $(\text{Done Subtasks} / \text{Total Subtasks}) \times 100\%$.
+  - **Carry-over Backlogs**: Unresolved tasks from previous days stay pinned as backlogs.
+  - **Recurring Schedules**: Auto-resets daily or weekly routines.
 
-- **👥 Team Monitoring & Work Logs**:
-  - View each team member's active tasks, progress bars, and completion score.
-  - Record daily notes and blockers for the team summary.
-  - Assign new tasks to team members directly.
-
-- **📧 Automated & On-Demand Gmail Reporting**:
-  - **☀️ Morning Plan & Backlog Report**: Dispatches current day's focus + carry-over backlog from past dates.
-  - **🌙 Evening Team Summary Report**: Aggregates all team members' progress, completed items, notes, and blockers into an executive HTML summary.
-  - **Configurable Schedule**: Set morning/evening dispatch times (e.g. `08:00` / `18:00`) with built-in cron.
-  - **One-Tap Manual Triggers**: "Send Morning Plan 🚀" and "Send Daily Log 🚀" directly from the UI.
-
-- **⚙️ Full Settings & Employee Management**:
-  - Add, edit, or deactivate team members and assign roles (`LEAD`, `MEMBER`).
-  - Configure SMTP host, port, Gmail address, App Password, and comma-separated recipients.
-  - Test SMTP connection and send test emails with instant diagnostics.
+- **📧 Automated & Manual Gmail Tabular Reports**:
+  - **☀️ Morning "Day Plan"**: Tabular report with Shift start (`8.30`), Plan preparation, tasks, priority, and assigned by (start/end times blank).
+  - **🌙 Evening "Task Log"**: Tabular report with start/end times (`8.45` - `9.00`, `9.00` - `5.30`), Shift off (`5.30`), and live overall productivity percentage (`93.61%`).
+  - **Cron Automation**: Runs automatically at your configured morning and evening hours.
 
 ---
 
-## 🚀 Quick Start (Local Development)
+## 🐳 Production Deployment (PostgreSQL + Docker + GHCR CI/CD)
 
-### 1. Install dependencies & initialize DB
-```bash
-npm install
-npx prisma db push
-npm run seed
-```
+### Continuous Deployment Workflow:
+1. When code is pushed to the `main` branch, GitHub Actions (`.github/workflows/deploy.yml`) builds the container image and pushes it to **GitHub Container Registry (GHCR)**: `ghcr.io/<your-username>/to-do_at1:latest`.
+2. On your VPS, `docker compose up -d` boots both the web application and **PostgreSQL 16**.
+3. **Database Persistence**: PostgreSQL data is stored in the Docker volume `postgres_data` so all your tasks, logs, and settings persist permanently across container updates and restarts.
+4. **Auto-Migration on Boot**: The container runs `docker-entrypoint.sh` to automatically sync the Prisma schema with PostgreSQL and seed initial configuration on first boot.
 
-### 2. Run development server
+### Deploying on your VPS:
 ```bash
-npm run dev
+# 1. Copy docker-compose.yml to your VPS directory (e.g. /opt/daily-tracker)
+mkdir -p /opt/daily-tracker
+cd /opt/daily-tracker
+
+# 2. Run with Docker Compose
+docker compose up -d
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 🔑 Configuring Gmail SMTP & App Password
+## 🔑 Gmail SMTP & App Password Setup
 
-To send daily reports via Gmail:
 1. Enable **2-Step Verification** on your [Google Account Security](https://myaccount.google.com/security).
 2. Go to [Google App Passwords](https://myaccount.google.com/apppasswords).
 3. Create a new App Name (e.g., `Daily Task PWA`) and generate a **16-character App Password**.
-4. In the app, navigate to the **Settings** tab:
+4. In the app's **Settings** tab:
    - **SMTP Host**: `smtp.gmail.com`
    - **SMTP Port**: `465` (SSL enabled)
    - **Sender Email**: Your Gmail address
    - **App Password**: The 16-character generated password
-   - **Email Recipients**: Comma-separated list (e.g., `boss@company.com, me@gmail.com`)
-5. Click **Test Connection 🔌** and **Save All Settings**.
-
----
-
-## 📱 Installing on iPhone & Mac (PWA)
-
-### On iPhone (Safari):
-1. Open the app URL in Safari.
-2. Tap the **Share button** (square with an arrow pointing up).
-3. Scroll down and tap **"Add to Home Screen"**.
-4. Launch the app directly from your Home Screen with a full-screen native feel.
-
-### On Mac (Chrome / Safari):
-- **Safari**: File $\rightarrow$ *Add to Dock...*
-- **Chrome**: Click the install icon in the address bar or *Settings* $\rightarrow$ *Save and Share* $\rightarrow$ *Install page as app...*
-
----
-
-## 🌐 Deploying to a Small VPS
-
-### Option A: Docker Compose (Recommended)
-1. Copy the repository to your VPS.
-2. Run:
-```bash
-docker compose up -d --build
-```
-The app will start on port `3000` with persistent SQLite storage in `./prisma/data`.
-
-### Option B: PM2 / Node.js
-```bash
-npm install
-npx prisma db push
-npm run build
-pm2 start npm --name "daily-task-tracker" -- start
-```
-
-### Option C: External VPS Cron Webhook
-If you prefer triggering reports from your VPS system crontab (`crontab -e`):
-```bash
-# Morning report at 8:00 AM
-0 8 * * * curl -s http://localhost:3000/api/cron?type=morning
-
-# Evening summary report at 6:00 PM
-0 18 * * * curl -s http://localhost:3000/api/cron?type=evening
-```
+   - **Email Recipients**: Comma-separated list (e.g. `manager@company.com, me@gmail.com`)
+5. Click **Test SMTP Connection** and **Save Settings**.

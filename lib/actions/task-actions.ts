@@ -247,3 +247,92 @@ export async function deleteSubtask(subtaskId: string, taskId: string) {
   revalidatePath('/');
   return { success: true };
 }
+
+/**
+ * Fetch monthly aggregated task & log data for exports & reporting
+ */
+export async function getMonthlyReportData(options: {
+  year: number;
+  month: number; // 1-12
+  userId?: string;
+}) {
+  const { year, month, userId } = options;
+  const startDate = new Date(year, month - 1, 1, 0, 0, 0);
+  const endDate = new Date(year, month, 0, 23, 59, 59);
+
+  const userWhere: any = { isActive: true };
+  if (userId && userId !== 'ALL') {
+    userWhere.id = userId;
+  }
+
+  const users = await prisma.user.findMany({
+    where: userWhere,
+    include: {
+      tasks: {
+        where: {
+          createdAt: { gte: startDate, lte: endDate },
+        },
+        include: {
+          subtasks: true,
+        },
+        orderBy: [{ createdAt: 'asc' }],
+      },
+      logs: {
+        where: {
+          date: { gte: startDate, lte: endDate },
+        },
+        orderBy: [{ date: 'asc' }],
+      },
+    },
+    orderBy: [{ role: 'asc' }, { name: 'asc' }],
+  });
+
+  let totalTasks = 0;
+  let completedTasks = 0;
+  let inProgressTasks = 0;
+  let totalProgress = 0;
+
+  const flattenedTasks: any[] = [];
+
+  users.forEach((u) => {
+    u.tasks.forEach((t) => {
+      totalTasks++;
+      if (t.status === 'DONE') completedTasks++;
+      else if (t.status === 'IN_PROGRESS') inProgressTasks++;
+      totalProgress += t.progress || 0;
+
+      flattenedTasks.push({
+        id: t.id,
+        date: t.createdAt,
+        userName: u.name,
+        userEmail: u.email,
+        title: t.title,
+        description: t.description,
+        status: t.status,
+        progress: t.progress,
+        priority: t.priority,
+        assignedBy: t.assignedBy,
+        startTime: t.startTime,
+        endTime: t.endTime,
+        subtasksCount: t.subtasks?.length || 0,
+        completedSubtasks: t.subtasks?.filter((s) => s.isDone).length || 0,
+      });
+    });
+  });
+
+  const averageProductivity =
+    totalTasks > 0 ? (totalProgress / totalTasks).toFixed(2) : '0.00';
+
+  return {
+    users,
+    tasks: flattenedTasks,
+    summary: {
+      totalTasks,
+      completedTasks,
+      inProgressTasks,
+      pendingTasks: totalTasks - completedTasks - inProgressTasks,
+      averageProductivity,
+      monthName: startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+    },
+  };
+}

@@ -84,8 +84,13 @@ function buildReportTableHtml(options: {
   config: any;
   mode: 'morning' | 'evening';
   targetDate?: Date;
+  customShift?: {
+    shiftStartTime?: string | null;
+    prepEndTime?: string | null;
+    shiftEndTime?: string | null;
+  };
 }) {
-  const { user, tasks, config, mode, targetDate = new Date() } = options;
+  const { user, tasks, config, mode, targetDate = new Date(), customShift } = options;
   const isMorning = mode === 'morning';
   const planTitle = isMorning ? 'Day Plan' : 'Task Log';
 
@@ -96,9 +101,9 @@ function buildReportTableHtml(options: {
     day: 'numeric',
   });
 
-  const shiftStart = config?.shiftStartTime || '8.30';
-  const prepEnd = config?.prepEndTime || '8.45';
-  const shiftEnd = config?.shiftEndTime || '5.30';
+  const shiftStart = customShift?.shiftStartTime || config?.shiftStartTime || '8.30';
+  const prepEnd = customShift?.prepEndTime || config?.prepEndTime || '8.45';
+  const shiftEnd = customShift?.shiftEndTime || config?.shiftEndTime || '5.30';
 
   // Calculate Overall Productivity Ratio
   const totalTasks = tasks.length;
@@ -109,9 +114,9 @@ function buildReportTableHtml(options: {
   const getPriorityStyle = (priority: string = 'High') => {
     const p = priority.toLowerCase();
     if (p === 'high') {
-      return 'color: #f87171; font-weight: 500;'; // soft high red/pink
+      return 'color: #f87171; font-weight: 500;';
     } else if (p === 'medium') {
-      return 'color: #38bdf8; font-weight: 500;'; // light blue
+      return 'color: #38bdf8; font-weight: 500;';
     } else {
       return 'color: #94a3b8; font-weight: 500;';
     }
@@ -120,11 +125,11 @@ function buildReportTableHtml(options: {
   const getAssignedByStyle = (assignedBy: string = 'Myself') => {
     const a = assignedBy.trim();
     if (a.toLowerCase() === 'myself') {
-      return 'color: #047857; font-weight: bold;'; // green
+      return 'color: #047857; font-weight: bold;';
     } else if (a.toLowerCase().includes('altitude') || a.toLowerCase().includes('lead')) {
-      return 'color: #b91c1c; font-weight: bold;'; // red
+      return 'color: #b91c1c; font-weight: bold;';
     } else {
-      return 'color: #b45309; font-weight: bold;'; // brownish
+      return 'color: #b45309; font-weight: bold;';
     }
   };
 
@@ -136,7 +141,7 @@ function buildReportTableHtml(options: {
 
   const getStatusStyle = (status: string, progress: number) => {
     if (status === 'DONE' || progress === 100) {
-      return 'color: #047857; font-weight: 500;'; // green
+      return 'color: #047857; font-weight: 500;';
     }
     return 'color: #1f2937; font-weight: 500;';
   };
@@ -193,14 +198,12 @@ function buildReportTableHtml(options: {
   return `
     <div style="font-family: Arial, Helvetica, sans-serif; max-width: 960px; margin: 0 auto; color: #000000; background: #ffffff;">
       <table style="width: 100%; border-collapse: collapse; border: 2px solid #000000; margin-bottom: 20px;">
-        <!-- Black Date Header -->
         <thead>
           <tr>
             <th colspan="7" style="background-color: #000000; color: #ffffff; font-size: 24px; font-weight: bold; padding: 12px; text-align: center; letter-spacing: 0.5px;">
               ${dateHeader}
             </th>
           </tr>
-          <!-- Main Column Headers -->
           <tr style="background-color: #ffffff; font-weight: bold;">
             <th style="${cellBorder} text-align: left; width: 68px;">Start time</th>
             <th style="${cellBorder} text-align: left; width: 68px;">End time</th>
@@ -209,7 +212,6 @@ function buildReportTableHtml(options: {
           </tr>
         </thead>
         <tbody>
-          <!-- Row 1: Shift started & Sign In -->
           <tr>
             <td style="${cellBorder} text-align: right;">${shiftStart}</td>
             <td style="${cellBorder}"></td>
@@ -218,7 +220,6 @@ function buildReportTableHtml(options: {
             </td>
           </tr>
 
-          <!-- Row 2: Prepared Day Plan -->
           <tr>
             <td style="${cellBorder} text-align: right;">${isMorning ? '' : shiftStart}</td>
             <td style="${cellBorder} text-align: right;">${isMorning ? '' : prepEnd}</td>
@@ -227,7 +228,6 @@ function buildReportTableHtml(options: {
             </td>
           </tr>
 
-          <!-- Row 3: Section Subheaders -->
           <tr style="font-weight: bold; background-color: #ffffff;">
             <td colspan="3" style="${cellBorder} text-align: center;">Tasks to be complete</td>
             <td style="${cellBorder} text-align: center; width: 95px;">Priority Level</td>
@@ -236,10 +236,8 @@ function buildReportTableHtml(options: {
             <td style="${cellBorder} text-align: center; width: 100px;">Productivity (%)</td>
           </tr>
 
-          <!-- Tasks Rows -->
           ${renderTaskRows()}
 
-          <!-- Shift Off Row -->
           <tr>
             <td style="${cellBorder}"></td>
             <td style="${cellBorder} text-align: right;">${isMorning ? '' : shiftEnd}</td>
@@ -248,7 +246,6 @@ function buildReportTableHtml(options: {
             </td>
           </tr>
 
-          <!-- Overall Productivity Footer -->
           <tr>
             <td colspan="6" style="${cellBorder} text-align: right; font-weight: bold; font-size: 14px; padding-right: 14px;">
               Overall Productivity Ratio of the Day (${user.name || 'Myself'})
@@ -298,21 +295,12 @@ export async function sendTestEmail(targetEmail: string): Promise<EmailSendResul
         status: 'DONE',
         progress: 100,
       },
-      {
-        title: 'KPI system update',
-        startTime: '',
-        endTime: '',
-        priority: 'High',
-        assignedBy: 'Nimesh',
-        status: 'IN_PROGRESS',
-        progress: 95,
-      },
     ];
 
     const testHtml = `
       <div style="font-family: Arial, sans-serif; padding: 10px;">
         <p style="font-size: 14px; color: #333; margin-bottom: 16px;">
-          ✅ <strong>SMTP Connection Test</strong> — Below is a live preview of your report layout:
+          <strong>SMTP Connection Test</strong> — Below is a live preview of your report layout:
         </p>
         ${buildReportTableHtml({
           user: testUser,
@@ -326,7 +314,7 @@ export async function sendTestEmail(targetEmail: string): Promise<EmailSendResul
     const info = await transporter.sendMail({
       from: `"${config.senderName || 'Daily Focus & Team Tracker'}" <${config.smtpUser}>`,
       to: recipient,
-      subject: `🧪 Test Report Preview - ${new Date().toLocaleDateString()}`,
+      subject: `Test Report Preview - ${new Date().toLocaleDateString()}`,
       html: testHtml,
     });
 
@@ -345,13 +333,13 @@ export async function sendTestEmail(targetEmail: string): Promise<EmailSendResul
 }
 
 /**
- * 1. Morning To-Do List Trigger
- * Title in table: "Day Plan"
- * Start time / End time cells are left blank in the morning
+ * 1. Morning Day Plan Trigger (Personal)
+ * Incorporates today's daily customized check-in time if available
  */
 export async function sendMorningTodoList(
   userId?: string,
-  recipientOverride?: string
+  recipientOverride?: string,
+  customCheckInTime?: string
 ): Promise<EmailSendResult> {
   try {
     const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
@@ -366,10 +354,8 @@ export async function sendMorningTodoList(
       throw new Error('No recipient email addresses configured. Please add them in Settings.');
     }
 
-    // Process recurring tasks first
     await processRecurringTasks(userId);
 
-    // Target user
     let targetUser;
     if (userId) {
       targetUser = await prisma.user.findUnique({ where: { id: userId } });
@@ -389,8 +375,34 @@ export async function sendMorningTodoList(
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
 
-    // Fetch pending backlogs + tasks scheduled for today
+    // Look up today's custom shift or save checkin
+    let shift = await prisma.dailyShift.findFirst({
+      where: {
+        userId: targetUser.id,
+        date: { gte: todayStart, lte: todayEnd },
+      },
+    });
+
+    if (customCheckInTime && customCheckInTime.trim()) {
+      if (shift) {
+        shift = await prisma.dailyShift.update({
+          where: { id: shift.id },
+          data: { shiftStartTime: customCheckInTime.trim() },
+        });
+      } else {
+        shift = await prisma.dailyShift.create({
+          data: {
+            userId: targetUser.id,
+            date: todayStart,
+            shiftStartTime: customCheckInTime.trim(),
+          },
+        });
+      }
+    }
+
     const tasks = await prisma.task.findMany({
       where: {
         userId: targetUser.id,
@@ -422,12 +434,13 @@ export async function sendMorningTodoList(
       tasks,
       config,
       mode: 'morning',
+      customShift: shift ? { shiftStartTime: shift.shiftStartTime, prepEndTime: shift.prepEndTime, shiftEndTime: shift.shiftEndTime } : undefined,
     });
 
     const info = await transporter.sendMail({
       from: `"${config.senderName || 'Daily Focus'}" <${config.smtpUser}>`,
       to: recipients.join(', '),
-      subject: `📋 Day Plan - ${targetUser.name} (${formattedDate})`,
+      subject: `Day Plan - ${targetUser.name} (${formattedDate})`,
       html: emailHtml,
     });
 
@@ -448,13 +461,13 @@ export async function sendMorningTodoList(
 }
 
 /**
- * 2. Evening / Forced Daily Team Log Trigger
- * Title in table: "Task Log"
- * Start time / End time values are included
+ * 2. Evening Task Log Trigger (Personal)
+ * Incorporates today's daily customized check-out time and check-in time
  */
 export async function sendDailySummaryReport(
   recipientOverride?: string,
-  targetUserId?: string
+  targetUserId?: string,
+  customCheckOutTime?: string
 ): Promise<EmailSendResult> {
   try {
     const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
@@ -471,6 +484,8 @@ export async function sendDailySummaryReport(
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
 
     const userWhere: any = { isActive: true };
     if (targetUserId) {
@@ -495,12 +510,35 @@ export async function sendDailySummaryReport(
           },
           orderBy: [{ createdAt: 'asc' }],
         },
-        logs: {
-          where: { date: { gte: todayStart } },
+        shifts: {
+          where: {
+            date: { gte: todayStart, lte: todayEnd },
+          },
         },
       },
       orderBy: [{ role: 'asc' }, { name: 'asc' }],
     });
+
+    // If customCheckOutTime passed for targeted user, persist it
+    if (targetUserId && customCheckOutTime && customCheckOutTime.trim()) {
+      const existing = await prisma.dailyShift.findFirst({
+        where: { userId: targetUserId, date: { gte: todayStart, lte: todayEnd } },
+      });
+      if (existing) {
+        await prisma.dailyShift.update({
+          where: { id: existing.id },
+          data: { shiftEndTime: customCheckOutTime.trim() },
+        });
+      } else {
+        await prisma.dailyShift.create({
+          data: {
+            userId: targetUserId,
+            date: todayStart,
+            shiftEndTime: customCheckOutTime.trim(),
+          },
+        });
+      }
+    }
 
     const transporter = await getTransporter();
 
@@ -511,28 +549,36 @@ export async function sendDailySummaryReport(
       day: 'numeric',
     });
 
-    // Render report tables for all selected users
     let combinedHtml = '';
     let totalTasksCount = 0;
 
     for (const u of users) {
       totalTasksCount += u.tasks.length;
+      const userShift = u.shifts[0] || null;
+      const finalShiftEnd =
+        (u.id === targetUserId && customCheckOutTime?.trim()) || userShift?.shiftEndTime || config?.shiftEndTime;
+
       combinedHtml += buildReportTableHtml({
         user: u,
         tasks: u.tasks,
         config,
         mode: 'evening',
+        customShift: {
+          shiftStartTime: userShift?.shiftStartTime || config?.shiftStartTime,
+          prepEndTime: userShift?.prepEndTime || config?.prepEndTime,
+          shiftEndTime: finalShiftEnd,
+        },
       });
       combinedHtml += '<br/><br/>';
     }
 
     const subjectTitle =
       users.length === 1
-        ? `📋 Task Log - ${users[0].name} (${formattedDate})`
-        : `🚀 Team Task Log Summary - (${formattedDate})`;
+        ? `Task Log - ${users[0].name} (${formattedDate})`
+        : `Task Log Summary - (${formattedDate})`;
 
     const info = await transporter.sendMail({
-      from: `"${config.senderName || 'Daily Team Tracker'}" <${config.smtpUser}>`,
+      from: `"${config.senderName || 'Daily Tracker'}" <${config.smtpUser}>`,
       to: recipients.join(', '),
       subject: subjectTitle,
       html: combinedHtml,
@@ -540,7 +586,7 @@ export async function sendDailySummaryReport(
 
     return {
       success: true,
-      message: `Task log summary successfully sent to ${recipients.join(', ')}!`,
+      message: `Task log successfully sent to ${recipients.join(', ')}!`,
       messageId: info.messageId,
       taskCount: totalTasksCount,
       recipientCount: recipients.length,
@@ -549,7 +595,7 @@ export async function sendDailySummaryReport(
     console.error('Send Daily Summary Error:', error);
     return {
       success: false,
-      message: error.message || 'Failed to send task log summary.',
+      message: error.message || 'Failed to send task log.',
     };
   }
 }

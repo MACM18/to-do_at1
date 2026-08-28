@@ -1,5 +1,5 @@
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -8,16 +8,17 @@ generator client {
 }
 
 model User {
-  id        String     @id @default(cuid())
+  id        String       @id @default(cuid())
   name      String
-  email     String     @unique
-  role      String     @default("MEMBER") // LEAD, MEMBER
+  email     String       @unique
+  role      String       @default("MEMBER") // LEAD, MEMBER
   avatar    String?
-  isActive  Boolean    @default(true)
+  isActive  Boolean      @default(true)
   tasks     Task[]
   logs      DailyLog[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  shifts    DailyShift[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 }
 
 model Task {
@@ -58,6 +59,20 @@ model DailyLog {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   date      DateTime @default(now())
   createdAt DateTime @default(now())
+}
+
+model DailyShift {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date           DateTime @default(now())
+  shiftStartTime String?  // Check-in time e.g. "8.30"
+  prepEndTime    String?  // Plan prep end e.g. "8.45"
+  shiftEndTime   String?  // Check-out time e.g. "5.30"
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, date])
 }
 
 model AppConfig {
