@@ -2,11 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '../prisma';
+import { getDayBounds } from '../time-utils';
 
 export async function getTodayMeetings(userId: string, targetDate?: Date) {
-  const date = targetDate || new Date();
-  const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0);
-  const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
+  const { startOfDay, endOfDay } = getDayBounds(targetDate || new Date());
 
   return prisma.meetingLog.findMany({
     where: {

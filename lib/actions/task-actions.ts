@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '../prisma';
 import { processRecurringTasks } from '../recurrence';
+import { getLocalTimeDot } from '../time-utils';
 
 /**
  * Calculates progress and status based on subtasks.
@@ -220,10 +221,7 @@ export async function updateTask(
 }
 
 function getCurrentDotTime(): string {
-  const now = new Date();
-  const h = now.getHours();
-  const m = String(now.getMinutes()).padStart(2, '0');
-  return `${h}.${m}`;
+  return getLocalTimeDot();
 }
 
 export async function startTask(taskId: string) {

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useTransition } from 'react';
 import { X, Users, Clock, Plus, Trash2, Calendar, FileText } from 'lucide-react';
 import { createMeeting, updateMeeting, deleteMeeting } from '@/lib/actions/meeting-actions';
+import { getLocalTimeDot } from '@/lib/time-utils';
 
 interface MeetingModalProps {
   isOpen: boolean;
@@ -33,12 +34,12 @@ export default function MeetingModal({
       setError('');
     } else {
       setTitle('');
-      // Set reasonable default based on current hour
+      const current = getLocalTimeDot();
+      setStartTime(current);
+      // Default end time 30 mins later
       const now = new Date();
-      const h = now.getHours();
-      const m = now.getMinutes() < 30 ? '00' : '30';
-      setStartTime(`${h}.${m}`);
-      setEndTime(`${h + 1}.${m}`);
+      now.setMinutes(now.getMinutes() + 30);
+      setEndTime(getLocalTimeDot(now));
       setDescription('');
       setError('');
     }

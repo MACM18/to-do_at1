@@ -2,12 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '../prisma';
+import { getDayBounds } from '../time-utils';
 
 export async function getTodayShift(userId: string) {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date();
-  todayEnd.setHours(23, 59, 59, 999);
+  const { startOfDay: todayStart, endOfDay: todayEnd } = getDayBounds(new Date());
 
   return prisma.dailyShift.findFirst({
     where: {
@@ -26,10 +24,7 @@ export async function saveTodayShift(data: {
   prepEndTime?: string;
   shiftEndTime?: string;
 }) {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date();
-  todayEnd.setHours(23, 59, 59, 999);
+  const { startOfDay: todayStart, endOfDay: todayEnd } = getDayBounds(new Date());
 
   const existing = await prisma.dailyShift.findFirst({
     where: {

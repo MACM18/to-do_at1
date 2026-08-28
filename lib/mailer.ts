@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { prisma } from './prisma';
+import { getDayBounds, getLocalTimeDot } from './time-utils';
 
 /**
  * Normalizes recipient list string for accurate comparison
@@ -499,10 +500,7 @@ export async function sendMorningReportEmail(userId?: string, customCheckInTime?
       throw new Error('No active user found to send report for.');
     }
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
+    const { startOfDay: todayStart, endOfDay: todayEnd } = getDayBounds(new Date());
 
     if (customCheckInTime && customCheckInTime.trim()) {
       const existing = await prisma.dailyShift.findFirst({
@@ -634,10 +632,7 @@ export async function sendEveningSummaryEmail(
       throw new Error('No recipient email address configured.');
     }
 
-    const todayStart = new Date(targetDate);
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(targetDate);
-    todayEnd.setHours(23, 59, 59, 999);
+    const { startOfDay: todayStart, endOfDay: todayEnd } = getDayBounds(targetDate);
 
     const userWhere = targetUserId ? { id: targetUserId, isActive: true } : { isActive: true };
     const isSaturday = todayStart.getDay() === 6;
