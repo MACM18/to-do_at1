@@ -3,11 +3,16 @@ set -e
 
 echo "Starting Daily Task & Team Tracker container..."
 
-# Run database schema push
-echo "Syncing database schema with PostgreSQL..."
+# Check database provider
+if echo "$DATABASE_URL" | grep -qE '^postgres(ql)?://'; then
+  echo "PostgreSQL database detected. Using PostgreSQL Prisma schema..."
+  cp prisma/schema.postgresql.prisma prisma/schema.prisma
+  npx prisma generate
+fi
+
+echo "Syncing database schema..."
 npx prisma db push --skip-generate
 
-# Seed default data if database is empty
 echo "Checking initial seed data..."
 npm run seed || true
 
