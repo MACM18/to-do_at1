@@ -4,8 +4,8 @@
   "description": "Daily Task & Team Progress Tracker with automated Gmail reports",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "background_color": "#0b1329",
+  "theme_color": "#0b1329",
   "orientation": "portrait-primary",
   "icons": [
     {
