@@ -38,6 +38,23 @@ function calculateTaskProgress(
 export async function getTasks(userId?: string) {
   await processRecurringTasks(userId);
 
+  // If a main admin user exists, reassign any orphaned tasks from older versions
+  const mainUser = await prisma.user.findFirst({
+    where: { role: { in: ['ADMIN', 'LEAD'] } },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  if (mainUser) {
+    const validUsers = await prisma.user.findMany({ select: { id: true } });
+    const validUserIds = validUsers.map((u) => u.id);
+    await prisma.task.updateMany({
+      where: {
+        userId: { notIn: validUserIds },
+      },
+      data: { userId: mainUser.id },
+    });
+  }
+
   const whereClause = userId ? { userId } : {};
 
   return prisma.task.findMany({
