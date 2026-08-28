@@ -280,8 +280,14 @@ export default function TaskCard({
     return (
       <>
         <div className="relative overflow-hidden rounded-xl group select-none">
-          {/* Underneath Revealed Actions (Mobile Only) */}
-          <div className="sm:hidden absolute inset-y-0 right-0 w-[95px] flex items-center justify-end pr-2 gap-1.5 z-0">
+          {/* Underneath Revealed Actions (Mobile Only - only visible when slided/dragging) */}
+          <div
+            className={`sm:hidden absolute inset-y-0 right-0 w-[95px] flex items-center justify-end pr-2 gap-1.5 z-0 transition-opacity duration-150 ${
+              isRevealed || isDragging.current
+                ? 'opacity-100 pointer-events-auto'
+                : 'opacity-0 pointer-events-none'
+            }`}
+          >
             {onEdit && (
               <button
                 type="button"
@@ -310,7 +316,7 @@ export default function TaskCard({
             </button>
           </div>
 
-          {/* Front Row (Slide transform only active on mobile) */}
+          {/* Front Row (Solid opaque surface with slide gesture on mobile) */}
           <div
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
@@ -328,7 +334,7 @@ export default function TaskCard({
                     : 'translateX(0px)'
                   : undefined,
             }}
-            className="relative z-10 flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-slate-50/90 dark:bg-slate-900/90 border border-slate-200/60 dark:border-slate-800/60 opacity-60 hover:opacity-95 transition-transform duration-200 ease-out"
+            className="relative z-10 flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 transition-transform duration-200 ease-out shadow-2xs"
           >
             <div className="flex items-center gap-2.5 flex-1 min-w-0">
               <button
@@ -398,8 +404,14 @@ export default function TaskCard({
   return (
     <>
       <div className="relative overflow-hidden rounded-2xl group select-none">
-        {/* Underneath Revealed Actions (Mobile Only) */}
-        <div className="sm:hidden absolute inset-y-0 right-0 w-[115px] flex items-center justify-end pr-2.5 gap-2 z-0">
+        {/* Underneath Revealed Actions (Mobile Only - only visible when slided/dragging) */}
+        <div
+          className={`sm:hidden absolute inset-y-0 right-0 w-[115px] flex items-center justify-end pr-2.5 gap-2 z-0 transition-opacity duration-150 ${
+            isRevealed || isDragging.current
+              ? 'opacity-100 pointer-events-auto'
+              : 'opacity-0 pointer-events-none'
+          }`}
+        >
           {onEdit && (
             <button
               type="button"
@@ -429,7 +441,7 @@ export default function TaskCard({
           </button>
         </div>
 
-        {/* Sliding Front Card Surface (Slides only on Mobile, static on Desktop) */}
+        {/* Sliding Front Card Surface (Solid opaque surface) */}
         <div
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
