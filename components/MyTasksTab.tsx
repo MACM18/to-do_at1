@@ -199,8 +199,10 @@ export default function MyTasksTab({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Tasks Feed & Creator (8 Cols on Desktop) */}
         <div className="lg:col-span-8 space-y-5">
-          {/* Creative Compact Task Creator Bar */}
-          <CompactTaskCreator userId={currentUser.id} />
+          {/* Creative Compact Task Creator Bar (Desktop only, mobile uses floating action button) */}
+          <div className="hidden sm:block">
+            <CompactTaskCreator userId={currentUser.id} />
+          </div>
 
           {/* Search & Filter Bar */}
           <div className="flex items-center justify-between gap-3">
@@ -539,6 +541,21 @@ export default function MyTasksTab({
             )}
           </div>
         </div>
+      </div>
+
+      {/* Mobile Floating Action Button (FAB) positioned above the bottom navbar */}
+      <div className="sm:hidden fixed bottom-20 right-4 z-40">
+        <button
+          type="button"
+          onClick={() => {
+            setEditingTask(null);
+            setIsTaskModalOpen(true);
+          }}
+          className="w-14 h-14 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-xl shadow-blue-500/35 flex items-center justify-center transition-transform active:scale-90 hover:scale-105 border-2 border-white dark:border-slate-800"
+          aria-label="Add Task"
+        >
+          <Plus className="w-6 h-6 stroke-[2.5]" />
+        </button>
       </div>
 
       {/* Task Creation & Edit Modal */}
