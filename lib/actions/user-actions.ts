@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '../prisma';
 
 export async function getUsers() {
-  return prisma.user.findMany({
+  let users = await prisma.user.findMany({
     include: {
       _count: {
         select: {
@@ -15,6 +15,28 @@ export async function getUsers() {
     },
     orderBy: [{ role: 'asc' }, { name: 'asc' }],
   });
+
+  if (users.length === 0) {
+    const defaultLead = await prisma.user.create({
+      data: {
+        name: 'Chathura (Lead)',
+        email: 'chathura@example.com',
+        role: 'LEAD',
+        isActive: true,
+      },
+      include: {
+        _count: {
+          select: {
+            tasks: true,
+            logs: true,
+          },
+        },
+      },
+    });
+    users = [defaultLead];
+  }
+
+  return users;
 }
 
 export async function createUser(data: {
@@ -72,7 +94,6 @@ export async function updateUser(
 }
 
 export async function deleteUser(userId: string) {
-  // Prevent deleting last user
   const count = await prisma.user.count();
   if (count <= 1) {
     throw new Error('Cannot delete the only remaining user in the system.');

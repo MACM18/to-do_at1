@@ -51,9 +51,12 @@ export default function MyTasksTab({
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const todayDay = new Date().getDay(); // 0: Sunday, 6: Saturday
+  const defaultShiftEnd = todayDay === 6 ? '1.30' : config?.shiftEndTime || '5.30';
+
   // Daily custom check-in & check-out state
   const [checkInTime, setCheckInTime] = useState(config?.shiftStartTime || '8.30');
-  const [checkOutTime, setCheckOutTime] = useState(config?.shiftEndTime || '5.30');
+  const [checkOutTime, setCheckOutTime] = useState(defaultShiftEnd);
   const [isShiftSaved, setIsShiftSaved] = useState(false);
 
   useEffect(() => {
@@ -63,11 +66,13 @@ export default function MyTasksTab({
         if (shift) {
           if (shift.shiftStartTime) setCheckInTime(shift.shiftStartTime);
           if (shift.shiftEndTime) setCheckOutTime(shift.shiftEndTime);
+        } else if (todayDay === 6) {
+          setCheckOutTime('1.30');
         }
       }
     }
     loadShift();
-  }, [currentUser?.id]);
+  }, [currentUser?.id, todayDay]);
 
   // Filter tasks strictly for current user
   const userTasks = tasks.filter((t) => t.userId === currentUser.id);
@@ -341,9 +346,26 @@ export default function MyTasksTab({
                 <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
                   <Clock className="w-3 h-3 text-blue-500" /> Today&apos;s Shift Hours
                 </div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-0.5">
-                  Check-in & Check-out Times
-                </h3>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    Check-in & Check-out
+                  </h3>
+                  <span
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                      todayDay === 0
+                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
+                        : todayDay === 6
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                    }`}
+                  >
+                    {todayDay === 0
+                      ? 'Sunday (Off Day)'
+                      : todayDay === 6
+                      ? 'Saturday (8.30 - 1.30)'
+                      : 'Mon-Fri (8.30 - 5.30)'}
+                  </span>
+                </div>
               </div>
               {isShiftSaved && (
                 <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">

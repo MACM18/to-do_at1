@@ -1,14 +1,22 @@
 import cron from 'node-cron';
 import { prisma } from './prisma';
-import { sendMorningTodoList, sendDailySummaryReport } from './mailer';
+import { sendDailySummaryReport } from './mailer';
 import { processRecurringTasks } from './recurrence';
 
-let morningTask: cron.ScheduledTask | null = null;
-let eveningTask: cron.ScheduledTask | null = null;
+let eveningWeekdayTask: cron.ScheduledTask | null = null;
+let eveningSaturdayTask: cron.ScheduledTask | null = null;
 let recurrenceMidnightTask: cron.ScheduledTask | null = null;
 
+const SCHEDULER_TIMEZONE = 'Asia/Colombo'; // UTC+05:30
+
 /**
- * Initializes and schedules cron jobs based on current AppConfig settings.
+ * Initializes and schedules background cron jobs based on working schedule:
+ * - Morning Day Plan: MANUAL ONLY (Triggered when lead clicks "Send Day Plan")
+ * - Evening Task Log (Automated):
+ *   - Mon - Fri at 17:30 (5:30 PM) / configured evening time
+ *   - Saturday at 13:30 (1:30 PM shift off)
+ *   - Sunday: Off (Skipped)
+ * - Midnight Recurring Reset: Mon - Sat at 00:01
  */
 export async function initScheduler() {
   try {
@@ -16,68 +24,87 @@ export async function initScheduler() {
     if (!config) return;
 
     // Stop existing scheduled tasks
-    if (morningTask) {
-      morningTask.stop();
-      morningTask = null;
+    if (eveningWeekdayTask) {
+      eveningWeekdayTask.stop();
+      eveningWeekdayTask = null;
     }
-    if (eveningTask) {
-      eveningTask.stop();
-      eveningTask = null;
+    if (eveningSaturdayTask) {
+      eveningSaturdayTask.stop();
+      eveningSaturdayTask = null;
     }
     if (recurrenceMidnightTask) {
       recurrenceMidnightTask.stop();
       recurrenceMidnightTask = null;
     }
 
-    // Schedule 1: Midnight Recurring Task Roll-Over (runs every day at 00:01)
-    recurrenceMidnightTask = cron.schedule('1 0 * * *', async () => {
-      console.log('[Cron] Running midnight recurring task processor...');
-      try {
-        const result = await processRecurringTasks();
-        console.log(`[Cron] Reset ${result.resetCount} recurring tasks for the new day.`);
-      } catch (err) {
-        console.error('[Cron] Recurring task processor error:', err);
-      }
-    });
-
-    // Schedule 2: Morning To-Do List
-    if (config.autoSendMorningReport && config.morningReportTime && config.smtpUser && config.emailRecipients) {
-      const [hourStr, minuteStr] = config.morningReportTime.split(':');
-      const minute = parseInt(minuteStr || '0', 10);
-      const hour = parseInt(hourStr || '8', 10);
-
-      const cronExpr = `${minute} ${hour} * * *`;
-      console.log(`[Cron] Scheduling Morning To-Do List at ${config.morningReportTime} (${cronExpr})`);
-
-      morningTask = cron.schedule(cronExpr, async () => {
-        console.log('[Cron] Triggering scheduled morning report...');
+    // Schedule 1: Midnight Recurring Task Roll-Over (Mon - Sat at 00:01)
+    recurrenceMidnightTask = cron.schedule(
+      '1 0 * * 1-6',
+      async () => {
+        console.log('[Cron] Running midnight recurring task processor (Mon-Sat)...');
         try {
-          const result = await sendMorningTodoList();
-          console.log('[Cron] Morning report sent:', result.message);
+          const result = await processRecurringTasks();
+          console.log(`[Cron] Reset ${result.resetCount} recurring tasks for the new day.`);
         } catch (err) {
-          console.error('[Cron] Morning report error:', err);
+          console.error('[Cron] Recurring task processor error:', err);
         }
-      });
-    }
+      },
+      { timezone: SCHEDULER_TIMEZONE }
+    );
 
-    // Schedule 3: Evening Team Daily Log Summary
-    if (config.autoSendDailyLog && config.eveningReportTime && config.smtpUser && config.emailRecipients) {
-      const [hourStr, minuteStr] = config.eveningReportTime.split(':');
-      const minute = parseInt(minuteStr || '0', 10);
-      const hour = parseInt(hourStr || '18', 10);
+    const hasRecipients =
+      Boolean(config.toRecipients) ||
+      Boolean(config.emailRecipients) ||
+      Boolean(config.ccRecipients) ||
+      Boolean(config.bccRecipients);
 
-      const cronExpr = `${minute} ${hour} * * *`;
-      console.log(`[Cron] Scheduling Evening Team Summary at ${config.eveningReportTime} (${cronExpr})`);
+    // Schedule 2: Automated Evening Task Log (Mon-Fri at 17:30, Sat at 13:30)
+    // Morning Day Plan is strictly manual-only upon user confirmation.
+    if (config.autoSendDailyLog && config.smtpUser && hasRecipients) {
+      // 2A: Weekday Evening Log (Monday to Friday, e.g. 17:30 or 18:00)
+      const eveningTime = config.eveningReportTime || '17:30';
+      const [hourStr, minuteStr] = eveningTime.split(':');
+      const minute = parseInt(minuteStr || '30', 10);
+      const hour = parseInt(hourStr || '17', 10);
 
-      eveningTask = cron.schedule(cronExpr, async () => {
-        console.log('[Cron] Triggering scheduled evening team summary...');
-        try {
-          const result = await sendDailySummaryReport();
-          console.log('[Cron] Evening summary report sent:', result.message);
-        } catch (err) {
-          console.error('[Cron] Evening summary report error:', err);
-        }
-      });
+      const weekdayCronExpr = `${minute} ${hour} * * 1-5`;
+      console.log(
+        `[Cron] Scheduling Weekday Task Log (Mon-Fri) at ${eveningTime} +05:30 (${weekdayCronExpr})`
+      );
+
+      eveningWeekdayTask = cron.schedule(
+        weekdayCronExpr,
+        async () => {
+          console.log('[Cron] Triggering scheduled weekday evening summary (Mon-Fri)...');
+          try {
+            const result = await sendDailySummaryReport();
+            console.log('[Cron] Weekday evening summary sent:', result.message);
+          } catch (err) {
+            console.error('[Cron] Weekday evening summary error:', err);
+          }
+        },
+        { timezone: SCHEDULER_TIMEZONE }
+      );
+
+      // 2B: Saturday Task Log (Saturday at 13:30 / 1:30 PM Shift End)
+      const saturdayCronExpr = '30 13 * * 6';
+      console.log(
+        `[Cron] Scheduling Saturday Task Log at 13:30 (1:30 PM) +05:30 (${saturdayCronExpr})`
+      );
+
+      eveningSaturdayTask = cron.schedule(
+        saturdayCronExpr,
+        async () => {
+          console.log('[Cron] Triggering scheduled Saturday task log at 1:30 PM...');
+          try {
+            const result = await sendDailySummaryReport();
+            console.log('[Cron] Saturday task log sent:', result.message);
+          } catch (err) {
+            console.error('[Cron] Saturday task log error:', err);
+          }
+        },
+        { timezone: SCHEDULER_TIMEZONE }
+      );
     }
   } catch (error) {
     console.error('Failed to initialize scheduler:', error);

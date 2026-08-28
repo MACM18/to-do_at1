@@ -195,9 +195,13 @@ function buildReportTableHtml(options: {
     day: 'numeric',
   });
 
+  const targetDay = targetDate.getDay(); // 0 is Sunday, 6 is Saturday
+  const isSaturday = targetDay === 6;
+  const defaultShiftEnd = isSaturday ? '1.30' : config?.shiftEndTime || '5.30';
+
   const shiftStart = customShift?.shiftStartTime || config?.shiftStartTime || '8.30';
   const prepEnd = customShift?.prepEndTime || config?.prepEndTime || '8.45';
-  const shiftEnd = customShift?.shiftEndTime || config?.shiftEndTime || '5.30';
+  const shiftEnd = customShift?.shiftEndTime || defaultShiftEnd;
 
   // Calculate Overall Productivity Ratio
   const totalTasks = tasks.length;
@@ -523,6 +527,7 @@ export async function sendMorningTodoList(
       tasks,
       config,
       mode: 'morning',
+      targetDate: todayStart,
       customShift: shift
         ? {
             shiftStartTime: shift.shiftStartTime,
@@ -637,6 +642,9 @@ export async function sendDailySummaryReport(
 
     const primaryUser = users[0];
 
+    const isSaturday = todayStart.getDay() === 6;
+    const defaultEnd = isSaturday ? '1.30' : config?.shiftEndTime || '5.30';
+
     if (targetUserId && customCheckOutTime && customCheckOutTime.trim()) {
       const existing = await prisma.dailyShift.findFirst({
         where: { userId: targetUserId, date: { gte: todayStart, lte: todayEnd } },
@@ -673,13 +681,14 @@ export async function sendDailySummaryReport(
       const finalShiftEnd =
         (u.id === targetUserId && customCheckOutTime?.trim()) ||
         userShift?.shiftEndTime ||
-        config?.shiftEndTime;
+        defaultEnd;
 
       combinedHtml += buildReportTableHtml({
         user: u,
         tasks: u.tasks,
         config,
         mode: 'evening',
+        targetDate: todayStart,
         customShift: {
           shiftStartTime: userShift?.shiftStartTime || config?.shiftStartTime,
           prepEndTime: userShift?.prepEndTime || config?.prepEndTime,

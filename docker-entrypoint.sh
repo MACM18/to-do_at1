@@ -13,8 +13,5 @@ fi
 echo "Syncing database schema..."
 npx prisma db push --skip-generate
 
-echo "Checking initial seed data..."
-npm run seed || true
-
 echo "Starting Next.js application on port $PORT..."
 exec "$@"
