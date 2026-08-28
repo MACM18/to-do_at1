@@ -20,6 +20,7 @@ import {
   CheckCheck,
   Check,
   Users,
+  Play,
 } from 'lucide-react';
 import TaskCard from './TaskCard';
 import TaskModal from './TaskModal';
@@ -28,6 +29,7 @@ import MeetingModal from './MeetingModal';
 import CompactTaskCreator from './CompactTaskCreator';
 import { triggerMorningReportAction, triggerEveningSummaryAction } from '@/lib/actions/config-actions';
 import { saveTodayShift, getTodayShift } from '@/lib/actions/shift-actions';
+import { getDayBounds } from '@/lib/time-utils';
 
 interface MyTasksTabProps {
   currentUser: any;
@@ -83,15 +85,29 @@ export default function MyTasksTab({
   // Filter tasks strictly for current user
   const userTasks = tasks.filter((t) => t.userId === currentUser.id);
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  const { startOfDay: todayStart } = getDayBounds(new Date());
 
-  const carryOverTasks = userTasks.filter(
-    (t) => new Date(t.createdAt) < todayStart && t.status !== 'DONE'
+  // Ongoing tasks: Started (has startTime) or in progress, not done
+  const ongoingTasks = userTasks.filter(
+    (t) => t.status !== 'DONE' && (Boolean(t.startTime) || t.status === 'IN_PROGRESS')
   );
 
+  // Carry-over backlog: Not started yet, created before today
+  const carryOverTasks = userTasks.filter(
+    (t) =>
+      new Date(t.createdAt) < todayStart &&
+      t.status !== 'DONE' &&
+      !t.startTime &&
+      t.status !== 'IN_PROGRESS'
+  );
+
+  // Scheduled for today: Not started yet, created today
   const activeTodayTasks = userTasks.filter(
-    (t) => new Date(t.createdAt) >= todayStart && t.status !== 'DONE'
+    (t) =>
+      new Date(t.createdAt) >= todayStart &&
+      t.status !== 'DONE' &&
+      !t.startTime &&
+      t.status !== 'IN_PROGRESS'
   );
 
   const completedTasks = userTasks.filter((t) => t.status === 'DONE');
@@ -106,6 +122,7 @@ export default function MyTasksTab({
     });
   };
 
+  const filteredOngoing = filterList(ongoingTasks);
   const filteredCarryOver = filterList(carryOverTasks);
   const filteredActiveToday = filterList(activeTodayTasks);
   const filteredCompleted = filterList(completedTasks);
@@ -239,6 +256,40 @@ export default function MyTasksTab({
               ))}
             </div>
           </div>
+
+          {/* Section 0: Highlighted Ongoing Tasks */}
+          {(filterStatus === 'ALL' || filterStatus === 'ACTIVE') && filteredOngoing.length > 0 && (
+            <div className="space-y-3 p-4 rounded-3xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/90 dark:border-blue-900/60 shadow-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600"></span>
+                  </span>
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300">
+                    Ongoing Tasks ({filteredOngoing.length})
+                  </h2>
+                </div>
+                <span className="text-[11px] font-medium text-blue-600 dark:text-blue-400">
+                  Currently In Progress
+                </span>
+              </div>
+
+              <div className="space-y-2.5">
+                {filteredOngoing.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    isCarryOver={false}
+                    onEdit={(t) => {
+                      setEditingTask(t);
+                      setIsTaskModalOpen(true);
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Section 1: Carry-Over Backlogs */}
           {(filterStatus === 'ALL' || filterStatus === 'ACTIVE') && filteredCarryOver.length > 0 && (

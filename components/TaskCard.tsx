@@ -189,6 +189,8 @@ export default function TaskCard({
     }
   };
 
+  const isOngoing = Boolean(task.startTime) && !isDone;
+
   const handleTouchEnd = () => {
     isDragging.current = false;
     touchStartX.current = null;
@@ -455,8 +457,10 @@ export default function TaskCard({
                   : 'translateX(0px)'
                 : undefined,
           }}
-          className={`relative z-10 rounded-2xl border transition-transform duration-200 ease-out ${
-            isCarryOver && !isDone
+          className={`relative z-10 rounded-2xl border transition-all duration-200 ease-out ${
+            isOngoing
+              ? 'bg-blue-50/30 dark:bg-blue-950/20 border-blue-300 dark:border-blue-700/80 shadow-md shadow-blue-500/5 ring-1 ring-blue-400/25'
+              : isCarryOver && !isDone
               ? 'bg-amber-50/40 dark:bg-slate-900 border-amber-200/80 dark:border-amber-900/50 shadow-sm'
               : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-md'
           }`}
@@ -481,6 +485,17 @@ export default function TaskCard({
               <div className="flex-1 min-w-0">
                 {/* Metadata Tags */}
                 <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                  {/* Ongoing In Progress Badge */}
+                  {isOngoing && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-600"></span>
+                      </span>
+                      <span>In Progress</span>
+                    </span>
+                  )}
+
                   {/* Creative Due Date Remaining Days Badge */}
                   {renderDueDateBadge(task.dueDate, isDone)}
 
