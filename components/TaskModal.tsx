@@ -17,6 +17,7 @@ import {
   RotateCcw,
   Layers,
   CheckCircle2,
+  CalendarDays,
 } from 'lucide-react';
 import { createTask, updateTask } from '@/lib/actions/task-actions';
 
@@ -67,7 +68,6 @@ function autoBalanceWeights(
   const weights = currentSubtasks.map((s) => s.weight ?? 0);
 
   if (delta > 0) {
-    // Deduct from other sliders starting with the subsequent ones
     const otherIndices: number[] = [];
     for (let i = changedIndex + 1; i < n; i++) otherIndices.push(i);
     for (let i = 0; i < changedIndex; i++) otherIndices.push(i);
@@ -83,7 +83,6 @@ function autoBalanceWeights(
     const actualIncrease = delta - remainingToDeduct;
     weights[changedIndex] = oldWeight + actualIncrease;
   } else {
-    // Amount to add to other sliders
     const amountToAdd = -delta;
     const otherIndices: number[] = [];
     for (let i = changedIndex + 1; i < n; i++) otherIndices.push(i);
@@ -190,7 +189,6 @@ export default function TaskModal({
     const nextSubtasks = [...subtasks, { title: newTitle, weight: 0 }];
     const count = nextSubtasks.length;
 
-    // Distribute weights evenly across all subtasks to keep 100%
     const base = Math.floor(100 / count);
     const remainder = 100 - base * count;
     const rebalanced = nextSubtasks.map((s, idx) => ({
@@ -215,7 +213,6 @@ export default function TaskModal({
       return;
     }
 
-    // Reallocate removed weight to remaining subtasks
     const extra = Math.floor(removedWeight / remaining.length);
     let rem = removedWeight % remaining.length;
     const rebalanced = remaining.map((s) => {
@@ -232,7 +229,6 @@ export default function TaskModal({
     setSubtasks(rebalanced);
   };
 
-  // Slider change with auto-balancing
   const handleWeightChange = (index: number, newWeight: number) => {
     const balanced = autoBalanceWeights(subtasks, index, newWeight);
     setSubtasks(balanced);
@@ -251,6 +247,17 @@ export default function TaskModal({
     setSubtasks(updated);
   };
 
+  // Helper date preset handler
+  const setDuePreset = (daysFromToday: number | null) => {
+    if (daysFromToday === null) {
+      setDueDate('');
+      return;
+    }
+    const d = new Date();
+    d.setDate(d.getDate() + daysFromToday);
+    setDueDate(d.toISOString().split('T')[0]);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
@@ -261,7 +268,7 @@ export default function TaskModal({
           title,
           description,
           recurrence,
-          dueDate: dueDate || null,
+          dueDate: dueDate ? new Date(dueDate) : null,
           startTime: startTime || null,
           endTime: endTime || null,
           priority,
@@ -279,7 +286,7 @@ export default function TaskModal({
           description,
           recurrence,
           userId,
-          dueDate: dueDate || null,
+          dueDate: dueDate ? new Date(dueDate) : null,
           startTime: startTime || null,
           endTime: endTime || null,
           priority,
@@ -309,8 +316,8 @@ export default function TaskModal({
               </h2>
               <p className="text-xs text-slate-500">
                 {editingTask
-                  ? 'Update task properties and auto-balanced 100% subtask weights'
-                  : 'Configure report times, priority, recurrence, and subtask weights'}
+                  ? 'Update task properties, due date countdown & 100% subtask weights'
+                  : 'Configure due date, report times, priority, and subtask weights'}
               </p>
             </div>
           </div>
@@ -343,7 +350,7 @@ export default function TaskModal({
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g., Check the sales details and update database"
+                  placeholder="e.g., Deliver production API & schema changes"
                   className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -360,6 +367,69 @@ export default function TaskModal({
                   placeholder="Add specific instructions, URLs, or deliverable notes..."
                   className="w-full px-3.5 py-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 />
+              </div>
+
+              {/* Due Date Section (Shows remaining days in My Tasks, not sent in emails) */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <CalendarDays className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    <span>Target Due Date</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    (Tracks countdown in My Tasks · not sent in emails)
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="flex-1 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {dueDate && (
+                    <button
+                      type="button"
+                      onClick={() => setDueDate('')}
+                      className="text-[11px] text-slate-400 hover:text-rose-500 px-2 py-1"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {/* Quick Presets */}
+                <div className="flex items-center gap-1.5 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setDuePreset(0)}
+                    className="px-2 py-0.5 text-[10px] font-semibold rounded-lg bg-white dark:bg-slate-900 hover:bg-blue-50 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDuePreset(1)}
+                    className="px-2 py-0.5 text-[10px] font-semibold rounded-lg bg-white dark:bg-slate-900 hover:bg-blue-50 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+                  >
+                    Tomorrow
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDuePreset(3)}
+                    className="px-2 py-0.5 text-[10px] font-semibold rounded-lg bg-white dark:bg-slate-900 hover:bg-blue-50 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+                  >
+                    +3 Days
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDuePreset(7)}
+                    className="px-2 py-0.5 text-[10px] font-semibold rounded-lg bg-white dark:bg-slate-900 hover:bg-blue-50 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+                  >
+                    Next Week
+                  </button>
+                </div>
               </div>
 
               {/* Start Time & End Time (for Evening Task Log) */}

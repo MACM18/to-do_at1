@@ -14,6 +14,10 @@ import {
   AlertCircle,
   User,
   ChevronLeft,
+  Calendar,
+  CalendarDays,
+  Zap,
+  Flame,
 } from 'lucide-react';
 import {
   toggleTaskComplete,
@@ -62,6 +66,77 @@ interface TaskCardProps {
   isCompactDone?: boolean;
   onEdit?: (task: Task) => void;
   showAssignee?: boolean;
+}
+
+/**
+ * Renders a creative countdown badge for remaining days on task cards
+ */
+function renderDueDateBadge(dueDate: Date | string | null | undefined, isDone: boolean) {
+  if (!dueDate) return null;
+
+  const due = new Date(dueDate);
+  const now = new Date();
+
+  // Midnight normalized for exact days
+  const dueMidnight = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const diffTime = dueMidnight.getTime() - nowMidnight.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+  const monthDay = due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  if (isDone) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-400 dark:text-slate-500">
+        <Calendar className="w-2.5 h-2.5 opacity-60" />
+        <span>was due {monthDay}</span>
+      </span>
+    );
+  }
+
+  if (diffDays < 0) {
+    const overdueDays = Math.abs(diffDays);
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300 dark:border-rose-900 animate-pulse shadow-xs">
+        <Flame className="w-3 h-3 text-rose-600 dark:text-rose-400 fill-rose-500" />
+        <span>{overdueDays}d Overdue</span>
+      </span>
+    );
+  }
+
+  if (diffDays === 0) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800 shadow-xs">
+        <Zap className="w-3 h-3 text-amber-600 dark:text-amber-400 fill-amber-500" />
+        <span>Due Today</span>
+      </span>
+    );
+  }
+
+  if (diffDays === 1) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-300 border border-sky-300 dark:border-sky-800">
+        <Clock className="w-3 h-3 text-sky-600 dark:text-sky-400" />
+        <span>Due Tomorrow</span>
+      </span>
+    );
+  }
+
+  if (diffDays <= 5) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900">
+        <CalendarDays className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+        <span>{diffDays}d left ({monthDay})</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+      <Calendar className="w-2.5 h-2.5 text-slate-400" />
+      <span>{diffDays}d left ({monthDay})</span>
+    </span>
+  );
 }
 
 export default function TaskCard({
@@ -257,6 +332,8 @@ export default function TaskCard({
                 {task.title}
               </span>
 
+              {renderDueDateBadge(task.dueDate, isDone)}
+
               {priority && (
                 <span className="text-[10px] font-medium text-slate-400 shrink-0">
                   {priority}
@@ -388,6 +465,9 @@ export default function TaskCard({
               <div className="flex-1 min-w-0">
                 {/* Metadata Tags */}
                 <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                  {/* Creative Due Date Remaining Days Badge */}
+                  {renderDueDateBadge(task.dueDate, isDone)}
+
                   {/* Timing */}
                   {(task.startTime || task.endTime) && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">

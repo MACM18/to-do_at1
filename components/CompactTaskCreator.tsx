@@ -11,6 +11,7 @@ import {
   X,
   Sparkles,
   Tag,
+  Calendar,
 } from 'lucide-react';
 import { createTask } from '@/lib/actions/task-actions';
 
@@ -29,6 +30,7 @@ export default function CompactTaskCreator({
   const [priority, setPriority] = useState('High');
   const [assignedBy, setAssignedBy] = useState('Myself');
   const [recurrence, setRecurrence] = useState('NONE');
+  const [dueDate, setDueDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [subtasks, setSubtasks] = useState<string[]>([]);
@@ -56,6 +58,7 @@ export default function CompactTaskCreator({
         priority,
         assignedBy,
         recurrence,
+        dueDate: dueDate ? new Date(dueDate) : undefined,
         startTime: startTime.trim() || undefined,
         endTime: endTime.trim() || undefined,
         userId,
@@ -64,6 +67,7 @@ export default function CompactTaskCreator({
 
       setTitle('');
       setDescription('');
+      setDueDate('');
       setStartTime('');
       setEndTime('');
       setSubtasks([]);
@@ -87,7 +91,7 @@ export default function CompactTaskCreator({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onFocus={() => {
-              if (!isExpanded && (description || subtasks.length > 0 || startTime)) {
+              if (!isExpanded && (description || subtasks.length > 0 || startTime || dueDate)) {
                 setIsExpanded(true);
               }
             }}
@@ -126,6 +130,18 @@ export default function CompactTaskCreator({
 
         {/* Quick Inline Pill Selectors */}
         <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+          {/* Due Date Pill */}
+          <div className="inline-flex items-center gap-1 px-2 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-[11px] text-slate-700 dark:text-slate-300">
+            <Calendar className="w-3 h-3 text-blue-500" />
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="bg-transparent font-semibold focus:outline-none cursor-pointer text-[11px]"
+              title="Target Due Date"
+            />
+          </div>
+
           {/* Priority Pill */}
           <div className="inline-flex items-center gap-1 px-2 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-[11px] text-slate-700 dark:text-slate-300">
             <Tag className="w-3 h-3 text-slate-400" />
@@ -181,7 +197,7 @@ export default function CompactTaskCreator({
           )}
         </div>
 
-        {/* Expandable Advanced Fields with Smooth Micro Animation */}
+        {/* Expandable Advanced Fields */}
         {isExpanded && (
           <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/80 space-y-3 animate-in fade-in slide-in-from-top-2 duration-150">
             {/* Description */}

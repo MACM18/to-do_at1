@@ -76,7 +76,7 @@ export async function createTask(formData: {
   description?: string;
   recurrence?: string;
   userId: string;
-  dueDate?: string | null;
+  dueDate?: string | Date | null;
   startTime?: string | null;
   endTime?: string | null;
   priority?: string;
@@ -144,7 +144,7 @@ export async function updateTask(
     recurrence?: string;
     status?: string;
     progress?: number;
-    dueDate?: string | null;
+    dueDate?: string | Date | null;
     startTime?: string | null;
     endTime?: string | null;
     priority?: string;
