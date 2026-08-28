@@ -26,6 +26,9 @@ export async function getConfig() {
         smtpPassword: '',
         senderName: 'Daily Focus & Team Tracker',
         emailRecipients: '',
+        toRecipients: '',
+        ccRecipients: '',
+        bccRecipients: '',
         morningReportTime: '08:00',
         eveningReportTime: '18:00',
         shiftStartTime: '8.30',
@@ -48,6 +51,9 @@ export async function updateConfig(data: {
   smtpPassword?: string;
   senderName?: string;
   emailRecipients?: string;
+  toRecipients?: string;
+  ccRecipients?: string;
+  bccRecipients?: string;
   morningReportTime?: string;
   eveningReportTime?: string;
   shiftStartTime?: string;
@@ -69,6 +75,12 @@ export async function updateConfig(data: {
   if (data.senderName !== undefined) updatePayload.senderName = data.senderName.trim();
   if (data.emailRecipients !== undefined)
     updatePayload.emailRecipients = data.emailRecipients.trim();
+  if (data.toRecipients !== undefined)
+    updatePayload.toRecipients = data.toRecipients.trim();
+  if (data.ccRecipients !== undefined)
+    updatePayload.ccRecipients = data.ccRecipients.trim();
+  if (data.bccRecipients !== undefined)
+    updatePayload.bccRecipients = data.bccRecipients.trim();
   if (data.morningReportTime !== undefined)
     updatePayload.morningReportTime = data.morningReportTime.trim();
   if (data.eveningReportTime !== undefined)

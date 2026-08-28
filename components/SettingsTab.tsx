@@ -52,8 +52,14 @@ export default function SettingsTab({
   const [senderName, setSenderName] = useState(
     initialConfig?.senderName || 'Daily Focus & Team Tracker'
   );
-  const [emailRecipients, setEmailRecipients] = useState(
-    initialConfig?.emailRecipients || ''
+  const [toRecipients, setToRecipients] = useState(
+    initialConfig?.toRecipients || initialConfig?.emailRecipients || ''
+  );
+  const [ccRecipients, setCcRecipients] = useState(
+    initialConfig?.ccRecipients || ''
+  );
+  const [bccRecipients, setBccRecipients] = useState(
+    initialConfig?.bccRecipients || ''
   );
   const [morningReportTime, setMorningReportTime] = useState(
     initialConfig?.morningReportTime || '08:00'
@@ -104,7 +110,10 @@ export default function SettingsTab({
           smtpUser,
           smtpPassword,
           senderName,
-          emailRecipients,
+          emailRecipients: toRecipients,
+          toRecipients,
+          ccRecipients,
+          bccRecipients,
           morningReportTime,
           eveningReportTime,
           shiftStartTime,
@@ -116,7 +125,7 @@ export default function SettingsTab({
         setConfig(updated);
         setStatusMessage({
           type: 'success',
-          text: 'Settings, shift timings, and schedules saved successfully.',
+          text: 'Settings, shift timings, and To/CC/BCC recipients saved successfully.',
         });
       } catch (err: any) {
         setStatusMessage({
@@ -148,7 +157,7 @@ export default function SettingsTab({
 
   // Send Test Email
   const handleSendTestEmail = () => {
-    if (!testEmailAddress.trim() && !emailRecipients.trim()) {
+    if (!testEmailAddress.trim() && !toRecipients.trim()) {
       setStatusMessage({
         type: 'error',
         text: 'Please enter a test recipient email address.',
@@ -158,7 +167,7 @@ export default function SettingsTab({
 
     setStatusMessage(null);
     startTransition(async () => {
-      const target = testEmailAddress.trim() || emailRecipients.split(',')[0].trim();
+      const target = testEmailAddress.trim() || toRecipients.split(',')[0].trim();
       const res = await sendTestEmailAction(target);
       if (res.success) {
         setStatusMessage({ type: 'success', text: res.message });
@@ -255,7 +264,7 @@ export default function SettingsTab({
                   <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                     Gmail & SMTP Email Settings
                   </h2>
-                  <p className="text-xs text-slate-500">Configure email dispatch and recipient list</p>
+                  <p className="text-xs text-slate-500">Configure email credentials, To, CC, and BCC lists</p>
                 </div>
               </div>
 
@@ -360,7 +369,7 @@ export default function SettingsTab({
                 </div>
               </div>
 
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Sender Display Name
                 </label>
@@ -372,19 +381,65 @@ export default function SettingsTab({
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Email Recipients (Comma-separated) *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={emailRecipients}
-                  onChange={(e) => setEmailRecipients(e.target.value)}
-                  placeholder="manager@company.com, me@gmail.com"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+            {/* Email Recipients Section: TO, CC, BCC */}
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    Recipient Lists (To, CC, BCC)
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Comma-separated email addresses for automated and manual dispatches</p>
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-1">
+                {/* To */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    To Recipients * <span className="text-slate-400 font-normal">(Primary direct recipients)</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={toRecipients}
+                    onChange={(e) => setToRecipients(e.target.value)}
+                    placeholder="manager@company.com, client@example.com"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* CC */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    CC Recipients <span className="text-slate-400 font-normal">(Carbon copy - visible to all)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={ccRecipients}
+                    onChange={(e) => setCcRecipients(e.target.value)}
+                    placeholder="team@company.com, supervisor@company.com"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* BCC */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    BCC Recipients <span className="text-slate-400 font-normal">(Blind carbon copy - hidden archive/backup)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={bccRecipients}
+                    onChange={(e) => setBccRecipients(e.target.value)}
+                    placeholder="archive@company.com, personal.backup@gmail.com"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
               </div>
             </div>
 

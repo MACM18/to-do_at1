@@ -98,7 +98,10 @@ model AppConfig {
   smtpPassword          String   @default("")
   smtpSecure            Boolean  @default(true)
   senderName            String   @default("Daily Focus & Team Tracker")
-  emailRecipients       String   @default("") // Comma-separated
+  emailRecipients       String   @default("") // Comma-separated fallback
+  toRecipients          String   @default("") // Comma-separated To
+  ccRecipients          String   @default("") // Comma-separated CC
+  bccRecipients         String   @default("") // Comma-separated BCC
   morningReportTime     String   @default("08:00") // HH:MM
   eveningReportTime     String   @default("18:00") // HH:MM
   shiftStartTime        String   @default("8.30")

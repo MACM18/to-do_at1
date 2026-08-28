@@ -75,6 +75,31 @@ export async function verifySmtpConnection(customConfig?: {
 }
 
 /**
+ * Resolves To, CC, and BCC recipient lists from config or overrides.
+ */
+function resolveRecipients(config: any, recipientOverride?: string) {
+  let toList: string[] = [];
+  let ccList: string[] = [];
+  let bccList: string[] = [];
+
+  if (recipientOverride && recipientOverride.trim()) {
+    toList = recipientOverride.split(',').map((r) => r.trim()).filter(Boolean);
+  } else {
+    const rawTo = config.toRecipients || config.emailRecipients || '';
+    toList = rawTo.split(',').map((r: string) => r.trim()).filter(Boolean);
+
+    if (config.ccRecipients) {
+      ccList = config.ccRecipients.split(',').map((r: string) => r.trim()).filter(Boolean);
+    }
+    if (config.bccRecipients) {
+      bccList = config.bccRecipients.split(',').map((r: string) => r.trim()).filter(Boolean);
+    }
+  }
+
+  return { toList, ccList, bccList };
+}
+
+/**
  * Retrieves or initializes monthly email thread metadata for threading replies.
  */
 async function getMonthlyThreadDetails(userId: string, targetDate: Date = new Date()) {
@@ -338,9 +363,9 @@ export async function sendTestEmail(targetEmail: string): Promise<EmailSendResul
     if (!config) throw new Error('Global configuration not found.');
 
     const transporter = await getTransporter();
-    const recipient = targetEmail || config.emailRecipients.split(',')[0]?.trim();
+    const { toList } = resolveRecipients(config, targetEmail);
 
-    if (!recipient) {
+    if (toList.length === 0) {
       throw new Error('Please provide a recipient email address.');
     }
 
@@ -382,14 +407,14 @@ export async function sendTestEmail(targetEmail: string): Promise<EmailSendResul
 
     const info = await transporter.sendMail({
       from: `"${config.senderName || 'Daily Focus & Team Tracker'}" <${config.smtpUser}>`,
-      to: recipient,
+      to: toList.join(', '),
       subject: `Test Report Preview - ${new Date().toLocaleDateString()}`,
       html: testHtml,
     });
 
     return {
       success: true,
-      message: `Test email sent successfully to ${recipient}!`,
+      message: `Test email sent successfully to ${toList.join(', ')}!`,
       messageId: info.messageId,
     };
   } catch (error: any) {
@@ -403,8 +428,8 @@ export async function sendTestEmail(targetEmail: string): Promise<EmailSendResul
 
 /**
  * 1. Morning Day Plan Trigger (Personal)
+ * Configurable To, CC, and BCC recipients.
  * Sends as a reply within the current month's conversation thread.
- * Automatically initiates a new thread at the start of each month.
  */
 export async function sendMorningTodoList(
   userId?: string,
@@ -415,13 +440,10 @@ export async function sendMorningTodoList(
     const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
     if (!config) throw new Error('Global configuration not found.');
 
-    const recipients = (recipientOverride || config.emailRecipients)
-      .split(',')
-      .map((r) => r.trim())
-      .filter(Boolean);
+    const { toList, ccList, bccList } = resolveRecipients(config, recipientOverride);
 
-    if (recipients.length === 0) {
-      throw new Error('No recipient email addresses configured. Please add them in Settings.');
+    if (toList.length === 0 && ccList.length === 0 && bccList.length === 0) {
+      throw new Error('No recipient email addresses configured (To, CC, BCC). Please add them in Settings.');
     }
 
     await processRecurringTasks(userId);
@@ -448,7 +470,6 @@ export async function sendMorningTodoList(
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999);
 
-    // Look up today's custom shift or save checkin
     let shift = await prisma.dailyShift.findFirst({
       where: {
         userId: targetUser.id,
@@ -492,7 +513,6 @@ export async function sendMorningTodoList(
 
     const transporter = await getTransporter();
 
-    // Get Monthly Threading Details
     const { monthKey, baseSubject, existingThread } = await getMonthlyThreadDetails(
       targetUser.id,
       todayStart
@@ -514,12 +534,14 @@ export async function sendMorningTodoList(
 
     const mailOptions: any = {
       from: `"${config.senderName || 'Daily Focus'}" <${config.smtpUser}>`,
-      to: recipients.join(', '),
       subject: existingThread ? `Re: ${existingThread.subject}` : baseSubject,
       html: emailHtml,
     };
 
-    // Attach In-Reply-To and References to chain into the monthly thread
+    if (toList.length > 0) mailOptions.to = toList.join(', ');
+    if (ccList.length > 0) mailOptions.cc = ccList.join(', ');
+    if (bccList.length > 0) mailOptions.bcc = bccList.join(', ');
+
     if (existingThread && existingThread.rootMessageId) {
       const lastMsg = existingThread.lastMessageId || existingThread.rootMessageId;
       mailOptions.inReplyTo = lastMsg;
@@ -532,15 +554,16 @@ export async function sendMorningTodoList(
 
     const info = await transporter.sendMail(mailOptions);
 
-    // Save/update this month's thread message ID
     await saveMonthlyThreadMessage(targetUser.id, monthKey, baseSubject, info.messageId);
+
+    const allRecipients = [...toList, ...ccList, ...bccList];
 
     return {
       success: true,
-      message: `Morning Day Plan successfully sent to ${recipients.join(', ')}!`,
+      message: `Morning Day Plan successfully sent to ${toList.join(', ')}${ccList.length > 0 ? ` (CC: ${ccList.join(', ')})` : ''}${bccList.length > 0 ? ` (BCC: ${bccList.length})` : ''}!`,
       messageId: info.messageId,
       taskCount: tasks.length,
-      recipientCount: recipients.length,
+      recipientCount: allRecipients.length,
     };
   } catch (error: any) {
     console.error('Send Morning List Error:', error);
@@ -553,8 +576,8 @@ export async function sendMorningTodoList(
 
 /**
  * 2. Evening Task Log Trigger (Personal)
+ * Configurable To, CC, and BCC recipients.
  * Sends as a reply within the current month's conversation thread.
- * Automatically initiates a new thread at the start of each month.
  */
 export async function sendDailySummaryReport(
   recipientOverride?: string,
@@ -565,13 +588,10 @@ export async function sendDailySummaryReport(
     const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
     if (!config) throw new Error('Global configuration not found.');
 
-    const recipients = (recipientOverride || config.emailRecipients)
-      .split(',')
-      .map((r) => r.trim())
-      .filter(Boolean);
+    const { toList, ccList, bccList } = resolveRecipients(config, recipientOverride);
 
-    if (recipients.length === 0) {
-      throw new Error('No recipient email addresses configured. Please add them in Settings.');
+    if (toList.length === 0 && ccList.length === 0 && bccList.length === 0) {
+      throw new Error('No recipient email addresses configured (To, CC, BCC). Please add them in Settings.');
     }
 
     const todayStart = new Date();
@@ -617,7 +637,6 @@ export async function sendDailySummaryReport(
 
     const primaryUser = users[0];
 
-    // If customCheckOutTime passed for targeted user, persist it
     if (targetUserId && customCheckOutTime && customCheckOutTime.trim()) {
       const existing = await prisma.dailyShift.findFirst({
         where: { userId: targetUserId, date: { gte: todayStart, lte: todayEnd } },
@@ -640,7 +659,6 @@ export async function sendDailySummaryReport(
 
     const transporter = await getTransporter();
 
-    // Get Monthly Threading Details
     const { monthKey, baseSubject, existingThread } = await getMonthlyThreadDetails(
       primaryUser.id,
       todayStart
@@ -673,12 +691,14 @@ export async function sendDailySummaryReport(
 
     const mailOptions: any = {
       from: `"${config.senderName || 'Daily Tracker'}" <${config.smtpUser}>`,
-      to: recipients.join(', '),
       subject: existingThread ? `Re: ${existingThread.subject}` : baseSubject,
       html: combinedHtml,
     };
 
-    // Attach In-Reply-To and References to chain into the monthly thread
+    if (toList.length > 0) mailOptions.to = toList.join(', ');
+    if (ccList.length > 0) mailOptions.cc = ccList.join(', ');
+    if (bccList.length > 0) mailOptions.bcc = bccList.join(', ');
+
     if (existingThread && existingThread.rootMessageId) {
       const lastMsg = existingThread.lastMessageId || existingThread.rootMessageId;
       mailOptions.inReplyTo = lastMsg;
@@ -691,15 +711,16 @@ export async function sendDailySummaryReport(
 
     const info = await transporter.sendMail(mailOptions);
 
-    // Save/update this month's thread message ID
     await saveMonthlyThreadMessage(primaryUser.id, monthKey, baseSubject, info.messageId);
+
+    const allRecipients = [...toList, ...ccList, ...bccList];
 
     return {
       success: true,
-      message: `Task log successfully sent to ${recipients.join(', ')}!`,
+      message: `Task log successfully sent to ${toList.join(', ')}${ccList.length > 0 ? ` (CC: ${ccList.join(', ')})` : ''}${bccList.length > 0 ? ` (BCC: ${bccList.length})` : ''}!`,
       messageId: info.messageId,
       taskCount: totalTasksCount,
-      recipientCount: recipients.length,
+      recipientCount: allRecipients.length,
     };
   } catch (error: any) {
     console.error('Send Daily Summary Error:', error);
