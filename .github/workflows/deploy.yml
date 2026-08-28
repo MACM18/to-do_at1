@@ -63,14 +63,8 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests
-
-      - name: Trigger Dokploy Deployment Webhook via Python
+      - name: Trigger Dokploy Deployment Webhook
         env:
           DOKPLOY_WEBHOOK_URL: ${{ secrets.DOKPLOY_WEBHOOK_URL }}
-          DOKPLOY_WEBHOOK_SECRET: ${{ secrets.DOKPLOY_WEBHOOK_SECRET }}
         run: |
-          python scripts/trigger_deploy.py
+          python scripts/trigger_deploy.py "$DOKPLOY_WEBHOOK_URL"
