@@ -153,6 +153,11 @@ export async function updateTask(
     subtasks?: { id?: string; title: string; weight?: number | null; isDone?: boolean }[];
   }
 ) {
+  const existingTask = await prisma.task.findUnique({
+    where: { id: taskId },
+    include: { subtasks: true },
+  });
+
   const updatePayload: any = {};
   if (data.title !== undefined) updatePayload.title = data.title.trim();
   if (data.description !== undefined) updatePayload.description = data.description?.trim() || null;
@@ -168,7 +173,7 @@ export async function updateTask(
 
   // If subtasks array is supplied in update, sync them
   if (data.subtasks !== undefined) {
-    const existingSubtasks = await prisma.subtask.findMany({ where: { taskId } });
+    const existingSubtasks = existingTask?.subtasks || [];
     const existingIds = existingSubtasks.map((s) => s.id);
     const providedIds = data.subtasks.map((s) => s.id).filter(Boolean) as string[];
 
@@ -203,11 +208,30 @@ export async function updateTask(
       }
     }
 
-    // Recalculate progress from fresh subtasks
+    // Recalculate progress from fresh subtasks if subtasks exist
     const freshSubtasks = await prisma.subtask.findMany({ where: { taskId } });
-    const calculated = calculateTaskProgress(freshSubtasks);
-    updatePayload.progress = calculated.progress;
-    updatePayload.status = calculated.status;
+    if (freshSubtasks.length > 0) {
+      const calculated = calculateTaskProgress(freshSubtasks);
+      updatePayload.progress = calculated.progress;
+      updatePayload.status = calculated.status;
+    } else {
+      // No subtasks on task: preserve existing status/progress unless explicitly provided
+      if (data.status !== undefined) {
+        updatePayload.status = data.status;
+      } else if (existingTask) {
+        updatePayload.status = existingTask.status;
+      }
+      if (data.progress !== undefined) {
+        updatePayload.progress = data.progress;
+      } else if (existingTask) {
+        updatePayload.progress = existingTask.progress;
+      }
+    }
+  }
+
+  // If the task was previously completed or marked DONE, ensure 100% progress
+  if (updatePayload.status === 'DONE' && (updatePayload.progress === undefined || updatePayload.progress < 100)) {
+    updatePayload.progress = 100;
   }
 
   const task = await prisma.task.update({

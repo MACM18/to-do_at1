@@ -124,6 +124,7 @@ export default function TaskModal({
   const [endTime, setEndTime] = useState('');
   const [priority, setPriority] = useState('High');
   const [assignedBy, setAssignedBy] = useState('Myself');
+  const [taskStatus, setTaskStatus] = useState('TODO');
   const [subtasks, setSubtasks] = useState<SubtaskItem[]>([]);
   const [subtaskInput, setSubtaskInput] = useState('');
   const [isPending, startTransition] = useTransition();
@@ -143,6 +144,7 @@ export default function TaskModal({
       setEndTime(editingTask.endTime || '');
       setPriority(editingTask.priority || 'High');
       setAssignedBy(editingTask.assignedBy || 'Myself');
+      setTaskStatus(editingTask.status || (editingTask.progress === 100 ? 'DONE' : 'TODO'));
 
       if (editingTask.subtasks && editingTask.subtasks.length > 0) {
         const count = editingTask.subtasks.length;
@@ -176,6 +178,7 @@ export default function TaskModal({
       setEndTime('');
       setPriority('High');
       setAssignedBy('Myself');
+      setTaskStatus('TODO');
       setSubtasks([]);
     }
   }, [editingTask, currentUserId, isOpen]);
@@ -269,6 +272,7 @@ export default function TaskModal({
           title,
           description,
           recurrence,
+          status: taskStatus,
           dueDate: dueDate ? new Date(dueDate) : null,
           startTime: startTime || null,
           endTime: endTime || null,
@@ -278,7 +282,7 @@ export default function TaskModal({
             id: s.id,
             title: s.title,
             weight: s.weight,
-            isDone: s.isDone,
+            isDone: taskStatus === 'DONE' ? true : s.isDone,
           })),
         });
       } else {
@@ -526,8 +530,37 @@ export default function TaskModal({
                 </div>
               </div>
 
-              {/* Priority & Assigned By */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Status & Priority & Assigned By */}
+              <div className={`grid ${editingTask ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2'} gap-3`}>
+                {editingTask && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Task Status
+                    </label>
+                    <select
+                      value={taskStatus}
+                      onChange={(e) => {
+                        const newStatus = e.target.value;
+                        setTaskStatus(newStatus);
+                        if (newStatus === 'DONE') {
+                          setSubtasks((prev) => prev.map((s) => ({ ...s, isDone: true })));
+                        }
+                      }}
+                      className={`w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800/50 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold ${
+                        taskStatus === 'DONE'
+                          ? 'text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800'
+                          : taskStatus === 'IN_PROGRESS'
+                          ? 'text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-800'
+                          : 'text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      <option value="DONE">Completed (100%)</option>
+                      <option value="IN_PROGRESS">In Progress</option>
+                      <option value="TODO">To Do (Pending)</option>
+                    </select>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
                     <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> Priority Level
