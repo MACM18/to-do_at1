@@ -129,3 +129,22 @@ model AppConfig {
   defaultUserId         String?
   updatedAt             DateTime @updatedAt
 }
+
+model SavedReport {
+  id              String   @id @default(cuid())
+  type            String   // MONDAY_KICKOFF, SATURDAY_PROGRESS, MONTHLY_SUMMARY
+  title           String   // e.g. "Monday Developer Workplan - Aug 29, 2026"
+  period          String   // e.g. "Weekly", "August 2026", "2026-08-29"
+  date            DateTime @default(now())
+  createdById     String?
+  createdByName   String?
+  summaryText     String   // Formatted text summary (ready for clipboard)
+  reportData      String   // JSON string of full report metrics & developer breakdowns
+  totalTasks      Int      @default(0)
+  completedCount  Int      @default(0)
+  inProgressCount Int      @default(0)
+  pendingCount    Int      @default(0)
+  completionRate  Float    @default(0.0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}

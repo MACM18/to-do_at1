@@ -24,6 +24,7 @@ import {
   getMondayWorkplanReportData,
   getSaturdayProgressReportData,
 } from '@/lib/actions/task-actions';
+import { saveReport } from '@/lib/actions/report-actions';
 
 interface ExecutiveReportModalProps {
   isOpen: boolean;
@@ -46,6 +47,7 @@ export default function ExecutiveReportModal({
   const [mondayData, setMondayData] = useState<any>(null);
   const [saturdayData, setSaturdayData] = useState<any>(null);
   const [copied, setCopied] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   // Load report data
@@ -131,6 +133,46 @@ export default function ExecutiveReportModal({
     document.body.removeChild(link);
   };
 
+  const handleSaveReport = async () => {
+    if (activeTab === 'MONDAY' && mondayData) {
+      startTransition(async () => {
+        await saveReport({
+          type: 'MONDAY_KICKOFF',
+          title: `Monday Developer Workplan - ${mondayData.dateStr}`,
+          period: mondayData.dateStr,
+          summaryText: mondayData.textSummary,
+          reportData: mondayData,
+          totalTasks: mondayData.totalActiveTasks,
+          completedCount: 0,
+          inProgressCount: mondayData.developers.reduce((sum: number, d: any) => sum + d.ongoing.length, 0),
+          pendingCount: mondayData.developers.reduce((sum: number, d: any) => sum + d.carryOver.length + d.activeToday.length, 0),
+          completionRate: 0,
+        });
+        setIsSaved(true);
+        setTimeout(() => setIsSaved(false), 3000);
+      });
+    } else if (activeTab === 'SATURDAY' && saturdayData) {
+      startTransition(async () => {
+        await saveReport({
+          type: saturdayData.isMonthly ? 'MONTHLY_SUMMARY' : 'SATURDAY_PROGRESS',
+          title: saturdayData.isMonthly
+            ? `Monthly Team Deliverables Review - ${saturdayData.periodTitle}`
+            : `Saturday Weekly Progress - ${saturdayData.periodTitle}`,
+          period: saturdayData.periodTitle,
+          summaryText: saturdayData.textSummary,
+          reportData: saturdayData,
+          totalTasks: saturdayData.summary.totalTasks,
+          completedCount: saturdayData.summary.totalCompleted,
+          inProgressCount: saturdayData.summary.totalInProgress,
+          pendingCount: saturdayData.summary.totalPending,
+          completionRate: parseFloat(saturdayData.summary.overallTeamCompletionRate) || 0,
+        });
+        setIsSaved(true);
+        setTimeout(() => setIsSaved(false), 3000);
+      });
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-150">
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-150">
@@ -160,7 +202,10 @@ export default function ExecutiveReportModal({
         <div className="px-6 py-3 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900">
           <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60">
             <button
-              onClick={() => setActiveTab('MONDAY')}
+              onClick={() => {
+                setActiveTab('MONDAY');
+                setIsSaved(false);
+              }}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all ${
                 activeTab === 'MONDAY'
                   ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
@@ -172,7 +217,10 @@ export default function ExecutiveReportModal({
             </button>
 
             <button
-              onClick={() => setActiveTab('SATURDAY')}
+              onClick={() => {
+                setActiveTab('SATURDAY');
+                setIsSaved(false);
+              }}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all ${
                 activeTab === 'SATURDAY'
                   ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
@@ -190,7 +238,10 @@ export default function ExecutiveReportModal({
               <span className="text-slate-400 font-medium">Scope:</span>
               <select
                 value={saturdayPeriod}
-                onChange={(e) => setSaturdayPeriod(e.target.value as any)}
+                onChange={(e) => {
+                  setSaturdayPeriod(e.target.value as any);
+                  setIsSaved(false);
+                }}
                 className="px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold focus:outline-none"
               >
                 <option value="AUTO">Auto (Last Sat = Monthly, else Weekly)</option>
@@ -202,6 +253,20 @@ export default function ExecutiveReportModal({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={handleSaveReport}
+              disabled={isPending || isSaved}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all shadow-xs ${
+                isSaved
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200'
+              }`}
+              title="Save this report to the Reports Archive"
+            >
+              {isSaved ? <Check className="w-3.5 h-3.5" /> : <Layers className="w-3.5 h-3.5 text-blue-600" />}
+              <span>{isSaved ? 'Saved to Archive' : 'Save to Archive'}</span>
+            </button>
+
             <button
               onClick={handleCopyClipboard}
               disabled={isPending}
@@ -220,7 +285,7 @@ export default function ExecutiveReportModal({
               <button
                 onClick={handleExportCSV}
                 disabled={isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
                 title="Download CSV Spreadsheet"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
@@ -231,7 +296,7 @@ export default function ExecutiveReportModal({
             <button
               onClick={handlePrint}
               disabled={isPending}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
               title="Export to PDF or Print"
             >
               <Printer className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />

@@ -10,9 +10,11 @@ import {
   UserCheck,
   Shield,
   Loader2,
+  FileText,
 } from 'lucide-react';
 import MyTasksTab from './MyTasksTab';
 import TeamViewTab from './TeamViewTab';
+import ReportsTab from './ReportsTab';
 import SettingsTab from './SettingsTab';
 import UserSwitcher from './UserSwitcher';
 import { logoutAction } from '@/lib/actions/auth-actions';
@@ -25,6 +27,7 @@ interface AppShellProps {
   initialLogs: any[];
   initialConfig: any;
   initialMeetings?: any[];
+  initialSavedReports?: any[];
 }
 
 export default function AppShell({
@@ -34,9 +37,10 @@ export default function AppShell({
   initialLogs,
   initialConfig,
   initialMeetings = [],
+  initialSavedReports = [],
 }: AppShellProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'MY_TASKS' | 'TEAM_VIEW' | 'SETTINGS'>('MY_TASKS');
+  const [activeTab, setActiveTab] = useState<'MY_TASKS' | 'TEAM_VIEW' | 'REPORTS' | 'SETTINGS'>('MY_TASKS');
   const [currentUserId, setCurrentUserId] = useState<string>(sessionUser?.id || initialUsers[0]?.id || '');
   const [isLoggingOut, startLogoutTransition] = useTransition();
 
@@ -112,6 +116,18 @@ export default function AppShell({
             </button>
 
             <button
+              onClick={() => setActiveTab('REPORTS')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all ${
+                activeTab === 'REPORTS'
+                  ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Reports</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('SETTINGS')}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all ${
                 activeTab === 'SETTINGS'
@@ -134,7 +150,7 @@ export default function AppShell({
               <RefreshCw className="w-4 h-4" />
             </button>
 
-            {/* In Team View / Settings: user switcher if lead */}
+            {/* In Team View / Reports / Settings: user switcher if lead */}
             {activeTab !== 'MY_TASKS' && initialUsers.length > 0 ? (
               <UserSwitcher
                 users={initialUsers}
@@ -194,6 +210,13 @@ export default function AppShell({
           />
         )}
 
+        {activeTab === 'REPORTS' && (
+          <ReportsTab
+            currentUser={currentUser}
+            savedReports={initialSavedReports}
+          />
+        )}
+
         {activeTab === 'SETTINGS' && (
           <SettingsTab
             config={initialConfig}
@@ -205,44 +228,56 @@ export default function AppShell({
 
       {/* Mobile Bottom Navigation Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-200/80 dark:border-slate-800 safe-bottom shadow-lg">
-        <div className="max-w-md mx-auto px-6 h-16 flex items-center justify-around">
+        <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-around">
           <button
             onClick={() => {
               setCurrentUserId(sessionUser.id);
               setActiveTab('MY_TASKS');
             }}
-            className={`flex flex-col items-center justify-center gap-1 transition-all py-1 px-4 rounded-2xl ${
+            className={`flex flex-col items-center justify-center gap-1 transition-all py-1 px-3 rounded-2xl ${
               activeTab === 'MY_TASKS'
                 ? 'text-blue-600 dark:text-blue-400 font-bold scale-105'
                 : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 font-medium'
             }`}
           >
             <CheckSquare className={`w-5 h-5 ${activeTab === 'MY_TASKS' ? 'stroke-[2.5]' : ''}`} />
-            <span className="text-[11px]">My Tasks</span>
+            <span className="text-[10px]">Tasks</span>
           </button>
 
           <button
             onClick={() => setActiveTab('TEAM_VIEW')}
-            className={`flex flex-col items-center justify-center gap-1 transition-all py-1 px-4 rounded-2xl ${
+            className={`flex flex-col items-center justify-center gap-1 transition-all py-1 px-3 rounded-2xl ${
               activeTab === 'TEAM_VIEW'
                 ? 'text-blue-600 dark:text-blue-400 font-bold scale-105'
                 : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 font-medium'
             }`}
           >
             <Users className={`w-5 h-5 ${activeTab === 'TEAM_VIEW' ? 'stroke-[2.5]' : ''}`} />
-            <span className="text-[11px]">Team View</span>
+            <span className="text-[10px]">Team</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('REPORTS')}
+            className={`flex flex-col items-center justify-center gap-1 transition-all py-1 px-3 rounded-2xl ${
+              activeTab === 'REPORTS'
+                ? 'text-blue-600 dark:text-blue-400 font-bold scale-105'
+                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 font-medium'
+            }`}
+          >
+            <FileText className={`w-5 h-5 ${activeTab === 'REPORTS' ? 'stroke-[2.5]' : ''}`} />
+            <span className="text-[10px]">Reports</span>
           </button>
 
           <button
             onClick={() => setActiveTab('SETTINGS')}
-            className={`flex flex-col items-center justify-center gap-1 transition-all py-1 px-4 rounded-2xl ${
+            className={`flex flex-col items-center justify-center gap-1 transition-all py-1 px-3 rounded-2xl ${
               activeTab === 'SETTINGS'
                 ? 'text-blue-600 dark:text-blue-400 font-bold scale-105'
                 : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 font-medium'
             }`}
           >
             <Settings className={`w-5 h-5 ${activeTab === 'SETTINGS' ? 'stroke-[2.5]' : ''}`} />
-            <span className="text-[11px]">Settings</span>
+            <span className="text-[10px]">Settings</span>
           </button>
         </div>
       </nav>
