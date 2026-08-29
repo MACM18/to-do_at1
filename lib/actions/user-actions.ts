@@ -5,7 +5,15 @@ import { prisma } from '../prisma';
 import { ensureMainUser, getCurrentUserSession } from './auth-actions';
 
 export async function getUsers() {
-  await ensureMainUser();
+  try {
+    await ensureMainUser();
+  } catch (err) {
+    console.error('Error ensuring main user in getUsers:', err);
+  }
+
+  if (!prisma || !prisma.user) {
+    return [];
+  }
 
   return prisma.user.findMany({
     include: {

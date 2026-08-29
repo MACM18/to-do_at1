@@ -16,6 +16,10 @@ export async function ensureMainUser() {
   const envEmail = (process.env.AUTH_EMAIL || 'chathura@example.com').trim().toLowerCase();
   const envPassword = process.env.AUTH_PASSWORD || 'changeme123';
 
+  if (!prisma || !prisma.user) {
+    return null;
+  }
+
   // 1. Look for matching user by email or exact name
   let user = await prisma.user.findFirst({
     where: {
