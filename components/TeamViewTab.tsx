@@ -15,12 +15,14 @@ import {
   Mail,
   ChevronRight,
   Sparkles,
+  Copy,
 } from 'lucide-react';
 import TaskCard from './TaskCard';
 import TaskModal from './TaskModal';
 import CompactTaskCreator from './CompactTaskCreator';
 import MonthlyReportModal from './MonthlyReportModal';
-import { getDayBounds } from '@/lib/time-utils';
+import ExecutiveReportModal from './ExecutiveReportModal';
+import { getDayBounds, isLastSaturdayOfMonth } from '@/lib/time-utils';
 
 interface TeamViewTabProps {
   currentUser: any;
@@ -36,12 +38,35 @@ export default function TeamViewTab({
   logs,
 }: TeamViewTabProps) {
   const activeUsers = users.filter((u) => u.isActive);
-  const [selectedUserId, setSelectedUserId] = useState<string>(activeUsers[0]?.id || 'ALL');
+  const otherMembers = activeUsers.filter((u) => u.id !== currentUser.id);
+  const [selectedUserId, setSelectedUserId] = useState<string>(
+    otherMembers[0]?.id || activeUsers[0]?.id || 'ALL'
+  );
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isMonthlyModalOpen, setIsMonthlyModalOpen] = useState(false);
+  const [isExecutiveModalOpen, setIsExecutiveModalOpen] = useState(false);
+  const [executiveReportType, setExecutiveReportType] = useState<'MONDAY' | 'SATURDAY' | 'MONTHLY'>('MONDAY');
   const [editingTask, setEditingTask] = useState<any>(null);
 
   const { startOfDay: todayStart } = getDayBounds(new Date());
+
+  // Check Colombo time for scheduled weekly report triggers
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Colombo',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(now);
+  const hour = parseInt(parts.find((p) => p.type === 'hour')?.value || '0', 10);
+  const minute = parseInt(parts.find((p) => p.type === 'minute')?.value || '0', 10);
+  const currentMinutes = hour * 60 + minute;
+  const colomboDay = todayStart.getDay(); // 0 is Sunday, 1 is Monday, 6 is Saturday
+
+  const isMondayKickoffTime = colomboDay === 1 && currentMinutes >= 600; // Monday after 10:00 AM
+  const isSaturdaySummaryTime = colomboDay === 6 && currentMinutes >= 810; // Saturday after 1:30 PM (13:30)
+  const isLastSat = isLastSaturdayOfMonth(now);
 
   const selectedUser = activeUsers.find((u) => u.id === selectedUserId) || activeUsers[0];
 
@@ -231,37 +256,138 @@ export default function TeamViewTab({
 
         {/* Right Column: Monthly Reporting Hub & Member Switcher (4 Cols on Desktop) */}
         <div className="lg:col-span-4 space-y-4">
-          {/* Monthly Report & Export Card */}
+          {/* Executive Reporting & Analytics Card */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm space-y-4">
             <div>
               <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 Reports & Analytics
               </div>
               <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mt-0.5">
-                Monthly Task Reports
+                Executive Team Reports
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Generate, export, or email monthly task summaries for all team members or individuals
+                Monday kickoff summaries & Saturday/Monthly progress reports
               </p>
             </div>
 
-            <button
-              onClick={() => setIsMonthlyModalOpen(true)}
-              className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-950/60 border border-blue-200/80 dark:border-blue-900/50 text-blue-900 dark:text-blue-200 text-xs font-bold transition-all active:scale-98 shadow-sm"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-blue-600 text-white">
-                  <Calendar className="w-4 h-4" />
+            {/* Scheduled Report Highlight: Monday Kickoff */}
+            {isMondayKickoffTime && (
+              <div className="p-3.5 rounded-2xl bg-blue-50/90 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" />
+                    <span>Monday Workplan Scheduled</span>
+                  </span>
+                  <span className="text-[10px] text-blue-600 font-semibold">&gt; 10:00 AM</span>
                 </div>
-                <div className="text-left">
-                  <div className="font-bold">Monthly Report & Exports</div>
-                  <div className="text-[10px] font-normal text-blue-700 dark:text-blue-400">
-                    CSV Export, Print PDF, Email Summary
+                <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Ready to copy developer tasks and share with your manager.
+                </p>
+                <button
+                  onClick={() => {
+                    setExecutiveReportType('MONDAY');
+                    setIsExecutiveModalOpen(true);
+                  }}
+                  className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Open Monday Kickoff Report</span>
+                </button>
+              </div>
+            )}
+
+            {/* Scheduled Report Highlight: Saturday Progress */}
+            {isSaturdaySummaryTime && (
+              <div className="p-3.5 rounded-2xl bg-indigo-50/90 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-ping" />
+                    <span>{isLastSat ? 'Monthly Report Ready' : 'Saturday Progress Ready'}</span>
+                  </span>
+                  <span className="text-[10px] text-indigo-600 font-semibold">&gt; 1:30 PM</span>
+                </div>
+                <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  {isLastSat
+                    ? 'Month-end deliverables, completion metrics & full-month breakdown.'
+                    : 'Weekly employee deliverables, completion rate & productivity metrics.'}
+                </p>
+                <button
+                  onClick={() => {
+                    setExecutiveReportType(isLastSat ? 'MONTHLY' : 'SATURDAY');
+                    setIsExecutiveModalOpen(true);
+                  }}
+                  className="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Open {isLastSat ? 'Monthly' : 'Saturday'} Report</span>
+                </button>
+              </div>
+            )}
+
+            {/* Report Actions */}
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  setExecutiveReportType('MONDAY');
+                  setIsExecutiveModalOpen(true);
+                }}
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-blue-50/60 hover:bg-blue-100/80 dark:bg-blue-950/30 dark:hover:bg-blue-950/50 border border-blue-100 dark:border-blue-900/40 text-blue-900 dark:text-blue-200 text-xs font-bold transition-all active:scale-98 shadow-2xs"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-blue-600 text-white">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-bold">Monday Developer Workplan</div>
+                    <div className="text-[10px] font-normal text-blue-700 dark:text-blue-400">
+                      Copy for Manager • PDF Export
+                    </div>
                   </div>
                 </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-blue-600" />
-            </button>
+                <ChevronRight className="w-4 h-4 text-blue-600" />
+              </button>
+
+              <button
+                onClick={() => {
+                  setExecutiveReportType(isLastSat ? 'MONTHLY' : 'SATURDAY');
+                  setIsExecutiveModalOpen(true);
+                }}
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-indigo-50/60 hover:bg-indigo-100/80 dark:bg-indigo-950/30 dark:hover:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900/40 text-indigo-900 dark:text-indigo-200 text-xs font-bold transition-all active:scale-98 shadow-2xs"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-indigo-600 text-white">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-bold">
+                      {isLastSat ? 'Saturday Month-End Report' : 'Saturday Weekly Progress'}
+                    </div>
+                    <div className="text-[10px] font-normal text-indigo-700 dark:text-indigo-400">
+                      Progress Metrics • CSV • PDF
+                    </div>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-indigo-600" />
+              </button>
+
+              <button
+                onClick={() => setIsMonthlyModalOpen(true)}
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/40 dark:hover:bg-slate-800/60 border border-slate-200/60 dark:border-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold transition-all active:scale-98"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-bold">Monthly CSV & Print Archive</div>
+                    <div className="text-[10px] font-normal text-slate-500">
+                      Historical Month Selector
+                    </div>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
 
             {/* Overall Team Progress Metric */}
             <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
@@ -293,10 +419,15 @@ export default function TeamViewTab({
             </h4>
 
             <div className="space-y-2">
-              {activeUsers.map((u) => {
+              {/* Prioritize other members, with current user at end */}
+              {[
+                ...activeUsers.filter((u) => u.id !== currentUser.id),
+                ...activeUsers.filter((u) => u.id === currentUser.id),
+              ].map((u) => {
                 const uTasks = tasks.filter((t) => t.userId === u.id);
                 const uDone = uTasks.filter((t) => t.status === 'DONE').length;
                 const isSelected = selectedUserId === u.id;
+                const isSelf = u.id === currentUser.id;
 
                 return (
                   <button
@@ -319,8 +450,13 @@ export default function TeamViewTab({
                         {u.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div className="text-xs font-bold text-slate-900 dark:text-slate-100">
-                          {u.name}
+                        <div className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                          <span>{u.name}</span>
+                          {isSelf && (
+                            <span className="text-[9px] px-1.5 py-0.2 rounded-full font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                              You
+                            </span>
+                          )}
                         </div>
                         <div className="text-[10px] text-slate-500">
                           {uDone}/{uTasks.length} completed
@@ -356,6 +492,13 @@ export default function TeamViewTab({
         onClose={() => setIsMonthlyModalOpen(false)}
         users={activeUsers}
         initialUserId={selectedUserId !== 'ALL' ? selectedUserId : 'ALL'}
+      />
+
+      {/* Executive Weekly / Monthly Report Modal */}
+      <ExecutiveReportModal
+        isOpen={isExecutiveModalOpen}
+        onClose={() => setIsExecutiveModalOpen(false)}
+        initialType={executiveReportType}
       />
     </div>
   );

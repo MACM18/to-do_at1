@@ -3,7 +3,13 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '../prisma';
 import { processRecurringTasks } from '../recurrence';
-import { getLocalTimeDot } from '../time-utils';
+import {
+  getLocalTimeDot,
+  getDayBounds,
+  getWeekBounds,
+  getMonthBounds,
+  isLastSaturdayOfMonth,
+} from '../time-utils';
 
 /**
  * Calculates progress and status based on subtasks.
@@ -538,5 +544,289 @@ export async function getMonthlyReportData(options: {
       averageProductivity,
       monthName: startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
     },
+  };
+}
+
+/**
+ * Monday Developer Workplan Report:
+ * Summarizes ongoing, pending backlog, and scheduled tasks for every developer on the team
+ * with formatted text ready to copy to clipboard for managers + structured PDF data.
+ */
+export async function getMondayWorkplanReportData() {
+  const { startOfDay: todayStart } = getDayBounds(new Date());
+
+  const activeUsers = await prisma.user.findMany({
+    where: { isActive: true },
+    include: {
+      tasks: {
+        where: {
+          OR: [
+            { status: { in: ['TODO', 'IN_PROGRESS'] } },
+            { recurrence: { in: ['DAILY', 'WEEKLY'] } },
+            { createdAt: { gte: todayStart } },
+          ],
+        },
+        include: {
+          subtasks: true,
+        },
+        orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }],
+      },
+      logs: {
+        where: {
+          date: { gte: todayStart },
+        },
+      },
+    },
+    orderBy: [{ role: 'asc' }, { name: 'asc' }],
+  });
+
+  const developersWorkplan = activeUsers.map((u) => {
+    const ongoing = u.tasks.filter(
+      (t) => t.status !== 'DONE' && (Boolean(t.startTime) || t.status === 'IN_PROGRESS')
+    );
+    const carryOver = u.tasks.filter(
+      (t) =>
+        new Date(t.createdAt) < todayStart &&
+        t.status !== 'DONE' &&
+        !t.startTime &&
+        t.status !== 'IN_PROGRESS'
+    );
+    const activeToday = u.tasks.filter(
+      (t) =>
+        new Date(t.createdAt) >= todayStart &&
+        t.status !== 'DONE' &&
+        !t.startTime &&
+        t.status !== 'IN_PROGRESS'
+    );
+    const todayLog = u.logs[0] || null;
+
+    return {
+      userId: u.id,
+      name: u.name,
+      role: u.role,
+      email: u.email,
+      totalActive: ongoing.length + carryOver.length + activeToday.length,
+      ongoing,
+      carryOver,
+      activeToday,
+      blockers: todayLog?.blockers || null,
+      summaryNotes: todayLog?.summary || null,
+    };
+  });
+
+  // Build Creative Text Summary for Manager Clipboard Sharing
+  const dateStr = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  let textSummary = `*TEAM WORKPLAN & DEVELOPER TASK REPORT*\nDate: ${dateStr}\n----------------------------------------\n\n`;
+
+  developersWorkplan.forEach((dev) => {
+    textSummary += `👤 *${dev.name.toUpperCase()}* (${dev.role})\n`;
+    textSummary += `Total Active Items: ${dev.totalActive}\n`;
+
+    if (dev.ongoing.length > 0) {
+      textSummary += `▶ ONGOING / IN PROGRESS (${dev.ongoing.length}):\n`;
+      dev.ongoing.forEach((t) => {
+        textSummary += `  • [${t.priority}] ${t.title} (${Number(t.progress || 0).toFixed(0)}% done${t.startTime ? `, Started: ${t.startTime}` : ''})\n`;
+      });
+    }
+
+    if (dev.carryOver.length > 0) {
+      textSummary += `⏳ PENDING BACKLOG (${dev.carryOver.length}):\n`;
+      dev.carryOver.forEach((t) => {
+        textSummary += `  • [${t.priority}] ${t.title}${t.dueDate ? ` (Due: ${new Date(t.dueDate).toLocaleDateString('en-US')})` : ''}\n`;
+      });
+    }
+
+    if (dev.activeToday.length > 0) {
+      textSummary += `📋 SCHEDULED TODAY (${dev.activeToday.length}):\n`;
+      dev.activeToday.forEach((t) => {
+        textSummary += `  • [${t.priority}] ${t.title}\n`;
+      });
+    }
+
+    if (dev.totalActive === 0) {
+      textSummary += `  (No active tasks pending)\n`;
+    }
+
+    if (dev.blockers) {
+      textSummary += `⚠️ Blocker: ${dev.blockers}\n`;
+    }
+
+    textSummary += `\n`;
+  });
+
+  textSummary += `----------------------------------------\nGenerated via Daily Focus Task Hub`;
+
+  return {
+    dateStr,
+    developers: developersWorkplan,
+    textSummary,
+    totalDevelopers: activeUsers.length,
+    totalActiveTasks: developersWorkplan.reduce((sum, d) => sum + d.totalActive, 0),
+  };
+}
+
+/**
+ * Saturday Team Progress Report:
+ * Handles weekly deliverables and automatically switches to full-month report on the last Saturday of the month.
+ */
+export async function getSaturdayProgressReportData(forcePeriod?: 'WEEKLY' | 'MONTHLY' | 'AUTO') {
+  const now = new Date();
+  const isLastSat = isLastSaturdayOfMonth(now);
+  const isMonthly = forcePeriod === 'MONTHLY' || (forcePeriod !== 'WEEKLY' && isLastSat);
+
+  let startDate: Date;
+  let endDate: Date;
+  let periodTitle: string;
+
+  if (isMonthly) {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Colombo',
+      year: 'numeric',
+      month: 'numeric',
+    });
+    const parts = formatter.formatToParts(now);
+    const year = parseInt(parts.find((p) => p.type === 'year')?.value || '2026', 10);
+    const month = parseInt(parts.find((p) => p.type === 'month')?.value || '1', 10);
+
+    const monthBounds = getMonthBounds(year, month);
+    startDate = monthBounds.startOfMonth;
+    endDate = monthBounds.endOfMonth;
+    periodTitle = `Monthly Team Deliverables (${startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })})`;
+  } else {
+    const weekBounds = getWeekBounds(now);
+    startDate = weekBounds.startOfWeek;
+    endDate = weekBounds.endOfWeek;
+    periodTitle = `Weekly Team Progress (${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})`;
+  }
+
+  const activeUsers = await prisma.user.findMany({
+    where: { isActive: true },
+    include: {
+      tasks: {
+        where: {
+          OR: [
+            { createdAt: { gte: startDate, lte: endDate } },
+            { updatedAt: { gte: startDate, lte: endDate } },
+            { status: { in: ['TODO', 'IN_PROGRESS'] } },
+            { recurrence: { in: ['DAILY', 'WEEKLY'] } },
+          ],
+        },
+        include: { subtasks: true },
+        orderBy: [{ status: 'asc' }, { createdAt: 'asc' }],
+      },
+      meetings: {
+        where: {
+          date: { gte: startDate, lte: endDate },
+        },
+        orderBy: { date: 'asc' },
+      },
+      logs: {
+        where: {
+          date: { gte: startDate, lte: endDate },
+        },
+        orderBy: { date: 'desc' },
+      },
+    },
+    orderBy: [{ role: 'asc' }, { name: 'asc' }],
+  });
+
+  let totalTasks = 0;
+  let totalCompleted = 0;
+  let totalInProgress = 0;
+  let totalPending = 0;
+  let totalMeetings = 0;
+  let grandProgressSum = 0;
+
+  const developersBreakdown = activeUsers.map((u) => {
+    const devCompleted = u.tasks.filter((t) => t.status === 'DONE');
+    const devInProgress = u.tasks.filter((t) => t.status === 'IN_PROGRESS' || (t.progress > 0 && t.status !== 'DONE'));
+    const devPending = u.tasks.filter((t) => t.status === 'TODO' && !t.startTime && t.progress === 0);
+
+    const devTotalItems = u.tasks.length + u.meetings.length;
+    const devProgressSum = u.tasks.reduce((sum, t) => sum + (t.progress || 0), 0) + u.meetings.length * 100;
+    const devAvgProd = devTotalItems > 0 ? (devProgressSum / devTotalItems).toFixed(2) : '0.00';
+
+    totalTasks += u.tasks.length;
+    totalCompleted += devCompleted.length;
+    totalInProgress += devInProgress.length;
+    totalPending += devPending.length;
+    totalMeetings += u.meetings.length;
+    grandProgressSum += devProgressSum;
+
+    return {
+      userId: u.id,
+      name: u.name,
+      role: u.role,
+      email: u.email,
+      totalTasks: u.tasks.length,
+      completedTasks: devCompleted,
+      inProgressTasks: devInProgress,
+      pendingTasks: devPending,
+      meetings: u.meetings,
+      productivityScore: devAvgProd,
+      completionRate: u.tasks.length > 0 ? ((devCompleted.length / u.tasks.length) * 100).toFixed(1) : '0.0',
+    };
+  });
+
+  const grandTotalItems = totalTasks + totalMeetings;
+  const overallTeamProductivity = grandTotalItems > 0 ? (grandProgressSum / grandTotalItems).toFixed(2) : '0.00';
+  const overallTeamCompletionRate = totalTasks > 0 ? ((totalCompleted / totalTasks) * 100).toFixed(1) : '0.0';
+
+  // Build Formatted Clipboard Summary
+  let textSummary = `*${isMonthly ? 'MONTHLY' : 'WEEKLY'} TEAM PROGRESS & COMPLETION REPORT*\nPeriod: ${periodTitle}\n`;
+  textSummary += `Team Overall Completion: ${overallTeamCompletionRate}% | Productivity Score: ${overallTeamProductivity}%\n`;
+  textSummary += `Total Deliverables: ${totalTasks} (${totalCompleted} Done, ${totalInProgress} In Progress, ${totalPending} Pending) + ${totalMeetings} Meetings\n`;
+  textSummary += `----------------------------------------\n\n`;
+
+  developersBreakdown.forEach((dev) => {
+    textSummary += `👤 *${dev.name.toUpperCase()}* (${dev.role}) - ${dev.completionRate}% Done (Score: ${dev.productivityScore}%)\n`;
+    textSummary += `Completed: ${dev.completedTasks.length} | In Progress: ${dev.inProgressTasks.length} | Pending: ${dev.pendingTasks.length} | Meetings: ${dev.meetings.length}\n`;
+
+    if (dev.completedTasks.length > 0) {
+      textSummary += `  ✓ Completed Deliverables:\n`;
+      dev.completedTasks.forEach((t) => {
+        textSummary += `    • ${t.title} (${t.startTime || '8.30'} - ${t.endTime || 'Done'})\n`;
+      });
+    }
+
+    if (dev.inProgressTasks.length > 0) {
+      textSummary += `  ▶ In-Progress Items:\n`;
+      dev.inProgressTasks.forEach((t) => {
+        textSummary += `    • ${t.title} (${Number(t.progress || 0).toFixed(0)}%)\n`;
+      });
+    }
+
+    if (dev.pendingTasks.length > 0) {
+      textSummary += `  ⏳ Pending Backlog (${dev.pendingTasks.length} items)\n`;
+    }
+
+    textSummary += `\n`;
+  });
+
+  textSummary += `----------------------------------------\nGenerated via Daily Focus Task Hub`;
+
+  return {
+    isMonthly,
+    isLastSaturday: isLastSat,
+    periodTitle,
+    startDate,
+    endDate,
+    summary: {
+      totalTasks,
+      totalCompleted,
+      totalInProgress,
+      totalPending,
+      totalMeetings,
+      overallTeamProductivity,
+      overallTeamCompletionRate,
+    },
+    developers: developersBreakdown,
+    textSummary,
   };
 }
