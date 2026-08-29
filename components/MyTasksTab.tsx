@@ -29,7 +29,7 @@ import MeetingModal from './MeetingModal';
 import CompactTaskCreator from './CompactTaskCreator';
 import { triggerMorningReportAction, triggerEveningSummaryAction } from '@/lib/actions/config-actions';
 import { saveTodayShift, getTodayShift } from '@/lib/actions/shift-actions';
-import { getDayBounds } from '@/lib/time-utils';
+import { getDayBounds, getLocalTimeDot, formatTo24HrDot } from '@/lib/time-utils';
 
 interface MyTasksTabProps {
   currentUser: any;
@@ -60,10 +60,10 @@ export default function MyTasksTab({
   const [isPending, startTransition] = useTransition();
 
   const todayDay = new Date().getDay(); // 0: Sunday, 6: Saturday
-  const defaultShiftEnd = todayDay === 6 ? '1.30' : config?.shiftEndTime || '5.30';
+  const defaultShiftEnd = todayDay === 6 ? '13.30' : config?.shiftEndTime ? formatTo24HrDot(config.shiftEndTime) : '17.30';
 
   // Daily custom check-in & check-out state
-  const [checkInTime, setCheckInTime] = useState(config?.shiftStartTime || '8.30');
+  const [checkInTime, setCheckInTime] = useState(formatTo24HrDot(config?.shiftStartTime || '08.30'));
   const [checkOutTime, setCheckOutTime] = useState(defaultShiftEnd);
   const [isShiftSaved, setIsShiftSaved] = useState(false);
 
@@ -72,10 +72,10 @@ export default function MyTasksTab({
       if (currentUser?.id) {
         const shift = await getTodayShift(currentUser.id);
         if (shift) {
-          if (shift.shiftStartTime) setCheckInTime(shift.shiftStartTime);
-          if (shift.shiftEndTime) setCheckOutTime(shift.shiftEndTime);
+          if (shift.shiftStartTime) setCheckInTime(formatTo24HrDot(shift.shiftStartTime));
+          if (shift.shiftEndTime) setCheckOutTime(formatTo24HrDot(shift.shiftEndTime));
         } else if (todayDay === 6) {
-          setCheckOutTime('1.30');
+          setCheckOutTime('13.30');
         }
       }
     }
@@ -429,8 +429,8 @@ export default function MyTasksTab({
                     {todayDay === 0
                       ? 'Sunday (Off Day)'
                       : todayDay === 6
-                      ? 'Saturday (8.30 - 1.30)'
-                      : 'Mon-Fri (8.30 - 5.30)'}
+                      ? 'Saturday (08.30 - 13.30)'
+                      : 'Mon-Fri (08.30 - 17.30)'}
                   </span>
                 </div>
               </div>
@@ -444,34 +444,34 @@ export default function MyTasksTab({
             <div className="grid grid-cols-2 gap-2.5">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  Check-in (e.g. 8.30)
+                  Check-in (e.g. 08.30)
                 </label>
                 <input
                   type="text"
                   value={checkInTime}
                   onChange={(e) => setCheckInTime(e.target.value)}
                   onBlur={handleSaveShiftTimes}
-                  placeholder="8.30"
+                  placeholder="08.30"
                   className="w-full px-3 py-1.5 text-xs font-mono font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  Check-out (e.g. 5.30)
+                  Check-out (e.g. 17.30)
                 </label>
                 <input
                   type="text"
                   value={checkOutTime}
                   onChange={(e) => setCheckOutTime(e.target.value)}
                   onBlur={handleSaveShiftTimes}
-                  placeholder="5.30"
+                  placeholder="17.30"
                   className="w-full px-3 py-1.5 text-xs font-mono font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
             <p className="text-[10px] text-slate-400">
-              Times are applied directly to morning Day Plan and evening Task Log reports.
+              Times are in 24h format and applied directly to morning Day Plan and evening Task Log reports.
             </p>
           </div>
 

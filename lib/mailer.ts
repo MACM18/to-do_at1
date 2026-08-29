@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 import { prisma } from './prisma';
-import { getDayBounds, getLocalTimeDot } from './time-utils';
+import { getDayBounds, getLocalTimeDot, formatTo24HrDot } from './time-utils';
 
 /**
  * Normalizes recipient list string for accurate comparison
@@ -212,11 +212,11 @@ function buildReportTableHtml(options: {
 
   const targetDay = targetDate.getDay(); // 0 is Sunday, 6 is Saturday
   const isSaturday = targetDay === 6;
-  const defaultShiftEnd = isSaturday ? '1.30' : config?.shiftEndTime || '5.30';
+  const defaultShiftEnd = isSaturday ? '13.30' : config?.shiftEndTime ? formatTo24HrDot(config.shiftEndTime) : '17.30';
 
-  const shiftStart = customShift?.shiftStartTime || config?.shiftStartTime || '8.30';
-  const prepEnd = customShift?.prepEndTime || config?.prepEndTime || '8.45';
-  const shiftEnd = customShift?.shiftEndTime || defaultShiftEnd;
+  const shiftStart = formatTo24HrDot(customShift?.shiftStartTime || config?.shiftStartTime || '08.30');
+  const prepEnd = formatTo24HrDot(customShift?.prepEndTime || config?.prepEndTime || '08.45');
+  const shiftEnd = formatTo24HrDot(customShift?.shiftEndTime || defaultShiftEnd);
 
   // Calculate Overall Productivity Ratio (tasks + meetings)
   const totalItems = tasks.length + meetings.length;
@@ -248,16 +248,15 @@ function buildReportTableHtml(options: {
   };
 
   const getStatusText = (status: string, progress: number) => {
-    if (status === 'DONE' || progress === 100) return 'Completed';
-    if (progress > 0 || status === 'IN_PROGRESS') return 'In progress';
+    if (status === 'DONE' || progress >= 100) return 'Completed';
+    if (status === 'IN_PROGRESS' || progress > 0) return 'In Progress';
     return 'Pending';
   };
 
   const getStatusStyle = (status: string, progress: number) => {
-    if (status === 'DONE' || progress === 100) {
-      return 'color: #047857; font-weight: 500;';
-    }
-    return 'color: #1f2937; font-weight: 500;';
+    if (status === 'DONE' || progress >= 100) return 'color: #047857; font-weight: 500;';
+    if (status === 'IN_PROGRESS' || progress > 0) return 'color: #d97706; font-weight: 500;';
+    return 'color: #64748b; font-weight: 500;';
   };
 
   const cellBorder = 'border: 1px solid #000000; padding: 6px 8px; font-size: 13px;';
@@ -276,8 +275,8 @@ function buildReportTableHtml(options: {
     // Render Tasks
     rowsHtml += tasks
       .map((t) => {
-        const startVal = isMorning ? '' : t.startTime || '';
-        const endVal = isMorning ? '' : t.endTime || '';
+        const startVal = isMorning ? '' : formatTo24HrDot(t.startTime);
+        const endVal = isMorning ? '' : formatTo24HrDot(t.endTime);
         const statusText = getStatusText(t.status, t.progress);
         const priorityText = t.priority || 'High';
         const assignedByText = t.assignedBy || 'Myself';
@@ -315,8 +314,8 @@ function buildReportTableHtml(options: {
     if (meetings && meetings.length > 0) {
       rowsHtml += meetings
         .map((m) => {
-          const startVal = isMorning ? '' : m.startTime || '';
-          const endVal = isMorning ? '' : m.endTime || '';
+          const startVal = isMorning ? '' : formatTo24HrDot(m.startTime);
+          const endVal = isMorning ? '' : formatTo24HrDot(m.endTime);
           return `
             <tr style="background-color: #fafafa;">
               <td style="${cellBorder} text-align: right; width: 68px;">${startVal}</td>
@@ -636,23 +635,24 @@ export async function sendEveningSummaryEmail(
 
     const userWhere = targetUserId ? { id: targetUserId, isActive: true } : { isActive: true };
     const isSaturday = todayStart.getDay() === 6;
-    const defaultEnd = isSaturday ? '1.30' : config?.shiftEndTime || '5.30';
+    const defaultEnd = isSaturday ? '13.30' : config?.shiftEndTime ? formatTo24HrDot(config.shiftEndTime) : '17.30';
 
     if (targetUserId && customCheckOutTime && customCheckOutTime.trim()) {
+      const formattedCheckout = formatTo24HrDot(customCheckOutTime);
       const existing = await prisma.dailyShift.findFirst({
         where: { userId: targetUserId, date: { gte: todayStart, lte: todayEnd } },
       });
       if (existing) {
         await prisma.dailyShift.update({
           where: { id: existing.id },
-          data: { shiftEndTime: customCheckOutTime.trim() },
+          data: { shiftEndTime: formattedCheckout },
         });
       } else {
         await prisma.dailyShift.create({
           data: {
             userId: targetUserId,
             date: todayStart,
-            shiftEndTime: customCheckOutTime.trim(),
+            shiftEndTime: formattedCheckout,
           },
         });
       }
@@ -672,10 +672,15 @@ export async function sendEveningSummaryEmail(
 
     for (const u of targetUsersList) {
       const userShift = u.shifts[0] || null;
-      const finalShiftEnd =
-        (u.id === targetUserId && customCheckOutTime?.trim()) ||
-        userShift?.shiftEndTime ||
+      let finalShiftEnd =
+        (u.id === targetUserId && customCheckOutTime?.trim() ? formatTo24HrDot(customCheckOutTime) : null) ||
+        (userShift?.shiftEndTime ? formatTo24HrDot(userShift.shiftEndTime) : null) ||
         defaultEnd;
+
+      // On Saturday, if shift end time is unset or defaulting to weekday 17.30 / 5.30, force 13.30
+      if (isSaturday && (!finalShiftEnd || finalShiftEnd === '17.30' || finalShiftEnd === '5.30')) {
+        finalShiftEnd = '13.30';
+      }
 
       // Find all daily recurring tasks for today
       const allDailyTasks = await prisma.task.findMany({
@@ -686,7 +691,7 @@ export async function sendEveningSummaryEmail(
         include: { subtasks: true },
       });
 
-      const shiftStartVal = userShift?.shiftStartTime || config?.shiftStartTime || '8.30';
+      const shiftStartVal = formatTo24HrDot(userShift?.shiftStartTime || config?.shiftStartTime || '08.30');
 
       for (const t of allDailyTasks) {
         // Complete all subtasks if not yet done
@@ -697,14 +702,20 @@ export async function sendEveningSummaryEmail(
           });
         }
 
-        // Complete daily task with 100% progress, start time from check-in, and checkout end time
+        // Determine correct end time: On Saturday, override 5.30/17.30 with 13.30 (or custom checkout)
+        let resolvedEndTime = t.endTime ? formatTo24HrDot(t.endTime) : null;
+        if (!resolvedEndTime || (isSaturday && (resolvedEndTime === '17.30' || resolvedEndTime === '5.30'))) {
+          resolvedEndTime = finalShiftEnd;
+        }
+
+        // Complete daily task with 100% progress, start time from check-in, and Saturday/weekday checkout end time
         await prisma.task.update({
           where: { id: t.id },
           data: {
             status: 'DONE',
             progress: 100,
-            startTime: t.startTime || shiftStartVal,
-            endTime: t.endTime || finalShiftEnd,
+            startTime: t.startTime ? formatTo24HrDot(t.startTime) : shiftStartVal,
+            endTime: resolvedEndTime,
           },
         });
       }

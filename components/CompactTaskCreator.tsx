@@ -221,20 +221,20 @@ export default function CompactTaskCreator({
                   type="text"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  placeholder="8.45"
+                  placeholder="08.45"
                   className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 focus:outline-none"
                 />
               </div>
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-500 mb-1 flex items-center gap-1">
-                  <Clock className="w-3 h-3" /> End Time (e.g. 5.30)
+                  <Clock className="w-3 h-3" /> End Time (e.g. 17.30)
                 </label>
                 <input
                   type="text"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
-                  placeholder="5.30"
+                  placeholder="17.30"
                   className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 focus:outline-none"
                 />
               </div>

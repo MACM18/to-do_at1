@@ -453,7 +453,7 @@ export default function TaskModal({
                       type="text"
                       value={startTime}
                       onChange={(e) => setStartTime(e.target.value)}
-                      placeholder="e.g., 8.30"
+                      placeholder="e.g., 08.30"
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                     />
                     <div className="flex flex-wrap gap-1 mt-1.5">
@@ -466,10 +466,17 @@ export default function TaskModal({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setStartTime('8.30')}
+                        onClick={() => setStartTime('08.30')}
                         className="px-1.5 py-0.5 text-[10px] font-semibold rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300"
                       >
-                        8.30
+                        08.30
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStartTime('08.45')}
+                        className="px-1.5 py-0.5 text-[10px] font-semibold rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300"
+                      >
+                        08.45
                       </button>
                       {startTime && (
                         <button
@@ -491,7 +498,7 @@ export default function TaskModal({
                       type="text"
                       value={endTime}
                       onChange={(e) => setEndTime(e.target.value)}
-                      placeholder="e.g., 5.30"
+                      placeholder="e.g., 17.30"
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                     />
                     <div className="flex flex-wrap gap-1 mt-1.5">
@@ -504,17 +511,17 @@ export default function TaskModal({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setEndTime('5.30')}
+                        onClick={() => setEndTime('17.30')}
                         className="px-1.5 py-0.5 text-[10px] font-semibold rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300"
                       >
-                        5.30
+                        17.30
                       </button>
                       <button
                         type="button"
-                        onClick={() => setEndTime('1.30')}
+                        onClick={() => setEndTime('13.30')}
                         className="px-1.5 py-0.5 text-[10px] font-semibold rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300"
                       >
-                        1.30
+                        13.30
                       </button>
                       {endTime && (
                         <button

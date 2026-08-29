@@ -9,6 +9,7 @@ import {
   sendEveningSummaryEmail,
 } from '../mailer';
 import { initScheduler } from '../scheduler';
+import { formatTo24HrDot } from '../time-utils';
 
 export async function getConfig() {
   if (!prisma || !prisma.appConfig) {
@@ -26,9 +27,9 @@ export async function getConfig() {
       bccRecipients: '',
       morningReportTime: '08:00',
       eveningReportTime: '18:00',
-      shiftStartTime: '8.30',
-      prepEndTime: '8.45',
-      shiftEndTime: '5.30',
+      shiftStartTime: '08.30',
+      prepEndTime: '08.45',
+      shiftEndTime: '17.30',
       autoSendMorningReport: false,
       autoSendDailyLog: false,
     };
@@ -54,9 +55,9 @@ export async function getConfig() {
         bccRecipients: '',
         morningReportTime: '08:00',
         eveningReportTime: '18:00',
-        shiftStartTime: '8.30',
-        prepEndTime: '8.45',
-        shiftEndTime: '5.30',
+        shiftStartTime: '08.30',
+        prepEndTime: '08.45',
+        shiftEndTime: '17.30',
         autoSendMorningReport: false,
         autoSendDailyLog: false,
       },
@@ -109,11 +110,11 @@ export async function updateConfig(data: {
   if (data.eveningReportTime !== undefined)
     updatePayload.eveningReportTime = data.eveningReportTime.trim();
   if (data.shiftStartTime !== undefined)
-    updatePayload.shiftStartTime = data.shiftStartTime.trim();
+    updatePayload.shiftStartTime = formatTo24HrDot(data.shiftStartTime);
   if (data.prepEndTime !== undefined)
-    updatePayload.prepEndTime = data.prepEndTime.trim();
+    updatePayload.prepEndTime = formatTo24HrDot(data.prepEndTime);
   if (data.shiftEndTime !== undefined)
-    updatePayload.shiftEndTime = data.shiftEndTime.trim();
+    updatePayload.shiftEndTime = formatTo24HrDot(data.shiftEndTime);
   if (data.autoSendMorningReport !== undefined)
     updatePayload.autoSendMorningReport = Boolean(data.autoSendMorningReport);
   if (data.autoSendDailyLog !== undefined)

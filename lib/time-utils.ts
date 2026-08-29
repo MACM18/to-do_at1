@@ -4,7 +4,33 @@
 export const APP_TIMEZONE = 'Asia/Colombo';
 
 /**
- * Returns formatted time string like "8.45", "12.58", or "17.30" in Asia/Colombo (+05:30)
+ * Normalizes any dot time string to clean 24-hour dot format:
+ * - "5.30" -> "17.30"
+ * - "1.30" -> "13.30"
+ * - "8.30" / "08.30" -> "08.30"
+ * - "8.45" / "08.45" -> "08.45"
+ * - "17.30" -> "17.30"
+ * - "13.30" -> "13.30"
+ */
+export function formatTo24HrDot(timeStr?: string | null): string {
+  if (!timeStr) return '';
+  const trimmed = timeStr.trim().replace(':', '.');
+  const [hStr, mStr] = trimmed.split('.');
+  let hour = parseInt(hStr, 10);
+  const min = mStr ? mStr.padEnd(2, '0').slice(0, 2) : '00';
+
+  if (isNaN(hour)) return timeStr;
+
+  // Convert 12-hour afternoon times without 24h prefix (1 to 7 -> 13 to 19)
+  if (hour >= 1 && hour <= 7) {
+    hour += 12;
+  }
+
+  return `${String(hour).padStart(2, '0')}.${min}`;
+}
+
+/**
+ * Returns formatted time string in 24-hour dot format like "08.45", "12.58", or "17.30" in Asia/Colombo (+05:30)
  */
 export function getLocalTimeDot(date: Date = new Date(), timeZone: string = APP_TIMEZONE): string {
   const formatter = new Intl.DateTimeFormat('en-GB', {
@@ -18,7 +44,7 @@ export function getLocalTimeDot(date: Date = new Date(), timeZone: string = APP_
   const hourStr = parts.find((p) => p.type === 'hour')?.value || '0';
   const minuteStr = parts.find((p) => p.type === 'minute')?.value || '00';
 
-  return `${parseInt(hourStr, 10)}.${minuteStr}`;
+  return `${hourStr.padStart(2, '0')}.${minuteStr}`;
 }
 
 /**

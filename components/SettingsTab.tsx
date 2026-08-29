@@ -34,6 +34,7 @@ import {
   triggerEveningSummaryAction,
 } from '@/lib/actions/config-actions';
 import { deleteUser, updateUserPassword } from '@/lib/actions/user-actions';
+import { formatTo24HrDot } from '@/lib/time-utils';
 
 interface SettingsTabProps {
   config: any;
@@ -43,13 +44,21 @@ interface SettingsTabProps {
 
 export default function SettingsTab({
   config: initialConfig,
-  users,
+  users: initialUsers,
   currentUser,
 }: SettingsTabProps) {
   const [config, setConfig] = useState(initialConfig);
+  const [users, setUsers] = useState<any[]>(initialUsers);
+  const [isPending, startTransition] = useTransition();
+  const [statusMessage, setStatusMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  // Form State
   const [smtpHost, setSmtpHost] = useState(initialConfig?.smtpHost || 'smtp.gmail.com');
   const [smtpPort, setSmtpPort] = useState(initialConfig?.smtpPort || 465);
-  const [smtpSecure, setSmtpSecure] = useState(initialConfig?.smtpSecure !== false);
+  const [smtpSecure, setSmtpSecure] = useState(initialConfig?.smtpSecure ?? true);
   const [smtpUser, setSmtpUser] = useState(initialConfig?.smtpUser || '');
   const [smtpPassword, setSmtpPassword] = useState(initialConfig?.smtpPassword || '');
   const [senderName, setSenderName] = useState(
@@ -58,12 +67,10 @@ export default function SettingsTab({
   const [toRecipients, setToRecipients] = useState(
     initialConfig?.toRecipients || initialConfig?.emailRecipients || ''
   );
-  const [ccRecipients, setCcRecipients] = useState(
-    initialConfig?.ccRecipients || ''
-  );
-  const [bccRecipients, setBccRecipients] = useState(
-    initialConfig?.bccRecipients || ''
-  );
+  const [ccRecipients, setCcRecipients] = useState(initialConfig?.ccRecipients || '');
+  const [bccRecipients, setBccRecipients] = useState(initialConfig?.bccRecipients || '');
+
+  // Automation & Shift State (24-hour format)
   const [morningReportTime, setMorningReportTime] = useState(
     initialConfig?.morningReportTime || '08:00'
   );
@@ -71,13 +78,13 @@ export default function SettingsTab({
     initialConfig?.eveningReportTime || '17:30'
   );
   const [shiftStartTime, setShiftStartTime] = useState(
-    initialConfig?.shiftStartTime || '8.30'
+    formatTo24HrDot(initialConfig?.shiftStartTime || '08.30')
   );
   const [prepEndTime, setPrepEndTime] = useState(
-    initialConfig?.prepEndTime || '8.45'
+    formatTo24HrDot(initialConfig?.prepEndTime || '08.45')
   );
   const [shiftEndTime, setShiftEndTime] = useState(
-    initialConfig?.shiftEndTime || '5.30'
+    formatTo24HrDot(initialConfig?.shiftEndTime || '17.30')
   );
   const [autoSendDailyLog, setAutoSendDailyLog] = useState(
     Boolean(initialConfig?.autoSendDailyLog)
@@ -98,13 +105,6 @@ export default function SettingsTab({
   const [confirmTargetPassword, setConfirmTargetPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [isPasswordConfirmOpen, setIsPasswordConfirmOpen] = useState(false);
-
-  const [statusMessage, setStatusMessage] = useState<{
-    type: 'success' | 'error';
-    text: string;
-  } | null>(null);
-
-  const [isPending, startTransition] = useTransition();
 
   const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'LEAD';
 
@@ -553,39 +553,39 @@ export default function SettingsTab({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                    Shift Start (e.g. 8.30)
+                    Shift Start (e.g. 08.30)
                   </label>
                   <input
                     type="text"
                     value={shiftStartTime}
                     onChange={(e) => setShiftStartTime(e.target.value)}
-                    placeholder="8.30"
+                    placeholder="08.30"
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100"
                   />
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                    Plan Prep End (e.g. 8.45)
+                    Plan Prep End (e.g. 08.45)
                   </label>
                   <input
                     type="text"
                     value={prepEndTime}
                     onChange={(e) => setPrepEndTime(e.target.value)}
-                    placeholder="8.45"
+                    placeholder="08.45"
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100"
                   />
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                    Weekday Shift End (e.g. 5.30)
+                    Weekday Shift End (e.g. 17.30)
                   </label>
                   <input
                     type="text"
                     value={shiftEndTime}
                     onChange={(e) => setShiftEndTime(e.target.value)}
-                    placeholder="5.30"
+                    placeholder="17.30"
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100"
                   />
                 </div>
