@@ -91,3 +91,70 @@ export function isLastSaturdayOfMonth(date: Date = new Date(), timeZone: string 
   const totalDaysInMonth = new Date(year, month, 0).getDate();
   return dayOfMonth + 7 > totalDaysInMonth;
 }
+
+/**
+ * Evaluates active report time slots in Asia/Colombo (+05:30):
+ * 1. Monday 10:00 AM to end of day (23:59:59)
+ * 2. Saturday 1:30 PM to end of day (23:59:59)
+ * 3. Monthly from last Saturday (from 1:30 PM) to the end of the month
+ */
+export function getReportTimeSlots(date: Date = new Date(), timeZone: string = APP_TIMEZONE) {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  });
+  const parts = formatter.formatToParts(date);
+  const year = parseInt(parts.find((p) => p.type === 'year')?.value || '2026', 10);
+  const month = parseInt(parts.find((p) => p.type === 'month')?.value || '1', 10);
+  const dayOfMonth = parseInt(parts.find((p) => p.type === 'day')?.value || '1', 10);
+
+  const timeFormatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  });
+  const timeParts = timeFormatter.formatToParts(date);
+  const hour = parseInt(timeParts.find((p) => p.type === 'hour')?.value || '0', 10);
+  const minute = parseInt(timeParts.find((p) => p.type === 'minute')?.value || '0', 10);
+  const currentMinutes = hour * 60 + minute;
+
+  const { startOfDay } = getDayBounds(date, timeZone);
+  const dayOfWeek = startOfDay.getDay(); // 0 is Sunday, 1 is Monday, 6 is Saturday
+
+  const totalDaysInMonth = new Date(year, month, 0).getDate();
+
+  // Find date of last Saturday of this month
+  let lastSaturdayDate = 0;
+  for (let d = totalDaysInMonth; d >= 1; d--) {
+    const testDate = new Date(`${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}T12:00:00.000+05:30`);
+    if (testDate.getDay() === 6) {
+      lastSaturdayDate = d;
+      break;
+    }
+  }
+
+  // 1. Monday 10:00 AM to end of the day (currentMinutes >= 600)
+  const isMondaySlot = dayOfWeek === 1 && currentMinutes >= 600;
+
+  // 2. Saturday 1:30 PM to end of the day (currentMinutes >= 810)
+  const isSaturdaySlot = dayOfWeek === 6 && currentMinutes >= 810;
+
+  // 3. Monthly from last Saturday of the month (starting 1:30 PM) to the end of the month
+  const isMonthlySlot =
+    (dayOfMonth === lastSaturdayDate && currentMinutes >= 810) ||
+    (dayOfMonth > lastSaturdayDate && dayOfMonth <= totalDaysInMonth);
+
+  return {
+    isMondaySlot,
+    isSaturdaySlot,
+    isMonthlySlot,
+    isLastSaturday: dayOfMonth === lastSaturdayDate && dayOfWeek === 6,
+    year,
+    month,
+    dayOfMonth,
+    lastSaturdayDate,
+  };
+}

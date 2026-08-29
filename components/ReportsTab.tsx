@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { deleteSavedReport, recreateSavedReport } from '@/lib/actions/report-actions';
 import ExecutiveReportModal from './ExecutiveReportModal';
-import { isLastSaturdayOfMonth } from '@/lib/time-utils';
+import { getReportTimeSlots } from '@/lib/time-utils';
 
 interface ReportsTabProps {
   currentUser: any;
@@ -51,22 +51,7 @@ export default function ReportsTab({ currentUser, savedReports = [] }: ReportsTa
   }, [savedReports]);
 
   // Colombo time checking for scheduled badges
-  const now = new Date();
-  const formatter = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Colombo',
-    hour: 'numeric',
-    minute: 'numeric',
-    hour12: false,
-  });
-  const parts = formatter.formatToParts(now);
-  const hour = parseInt(parts.find((p) => p.type === 'hour')?.value || '0', 10);
-  const minute = parseInt(parts.find((p) => p.type === 'minute')?.value || '0', 10);
-  const currentMinutes = hour * 60 + minute;
-  const colomboDay = now.getDay();
-
-  const isMondayKickoffTime = colomboDay === 1 && currentMinutes >= 600; // Monday > 10:00 AM
-  const isSaturdaySummaryTime = colomboDay === 6 && currentMinutes >= 810; // Saturday > 1:30 PM
-  const isLastSat = isLastSaturdayOfMonth(now);
+  const { isMondaySlot, isSaturdaySlot, isMonthlySlot, isLastSaturday } = getReportTimeSlots(new Date());
 
   const handleDelete = () => {
     if (!deleteConfirmReport) return;
@@ -120,95 +105,124 @@ export default function ReportsTab({ currentUser, savedReports = [] }: ReportsTa
               Reports & Progress Archive
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Generate manual Monday developer workplans, Saturday weekly summaries, or full-month reviews
+              Manual report generation active during weekly and monthly timeframes
             </p>
           </div>
 
-          {/* Quick Trigger Buttons */}
+          {/* Quick Trigger Buttons: Display strictly when active */}
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => {
-                setModalType('MONDAY');
-                setIsExecutiveModalOpen(true);
-              }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all active:scale-95 shadow-xs ${
-                isMondayKickoffTime
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white ring-4 ring-blue-500/20 animate-pulse'
-                  : 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-              }`}
-            >
-              <Calendar className="w-4 h-4" />
-              <span>Generate Monday Workplan</span>
-              {isMondayKickoffTime && (
+            {isMondaySlot && (
+              <button
+                onClick={() => {
+                  setModalType('MONDAY');
+                  setIsExecutiveModalOpen(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all active:scale-95 shadow-xs bg-blue-600 hover:bg-blue-700 text-white ring-4 ring-blue-500/20"
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Generate Monday Workplan</span>
                 <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white text-blue-700 font-black uppercase">
                   Active Now
                 </span>
-              )}
-            </button>
+              </button>
+            )}
 
-            <button
-              onClick={() => {
-                setModalType(isLastSat ? 'MONTHLY' : 'SATURDAY');
-                setIsExecutiveModalOpen(true);
-              }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all active:scale-95 shadow-xs ${
-                isSaturdaySummaryTime
-                  ? 'bg-indigo-600 hover:bg-indigo-700 text-white ring-4 ring-indigo-500/20 animate-pulse'
-                  : 'bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
-              }`}
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{isLastSat ? 'Generate Monthly Report' : 'Generate Saturday Progress'}</span>
-              {isSaturdaySummaryTime && (
+            {isSaturdaySlot && !isMonthlySlot && (
+              <button
+                onClick={() => {
+                  setModalType('SATURDAY');
+                  setIsExecutiveModalOpen(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all active:scale-95 shadow-xs bg-indigo-600 hover:bg-indigo-700 text-white ring-4 ring-indigo-500/20"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Generate Saturday Progress</span>
                 <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white text-indigo-700 font-black uppercase">
                   Active Now
                 </span>
-              )}
-            </button>
+              </button>
+            )}
+
+            {isMonthlySlot && (
+              <button
+                onClick={() => {
+                  setModalType('MONTHLY');
+                  setIsExecutiveModalOpen(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all active:scale-95 shadow-xs bg-purple-600 hover:bg-purple-700 text-white ring-4 ring-purple-500/20"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Generate Monthly Report</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white text-purple-700 font-black uppercase">
+                  Active Now
+                </span>
+              </button>
+            )}
           </div>
         </div>
 
         {/* Scheduled Timing Alerts */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
           <div className="p-3 rounded-2xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-blue-600" />
               <div>
                 <span className="font-bold text-slate-800 dark:text-slate-200">
-                  Monday Developer Workplan
+                  Monday Workplan
                 </span>
-                <div className="text-[10px] text-slate-500">Every Monday after 10:00 AM</div>
+                <div className="text-[10px] text-slate-500">Mon 10:00 AM – EOD</div>
               </div>
             </div>
             <span
               className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                isMondayKickoffTime
+                isMondaySlot
                   ? 'bg-blue-600 text-white'
                   : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
               }`}
             >
-              {isMondayKickoffTime ? 'Scheduled Ready' : 'Pending Schedule'}
+              {isMondaySlot ? 'Active' : 'Inactive'}
             </span>
           </div>
 
           <div className="p-3 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-indigo-600" />
+              <Clock className="w-4 h-4 text-indigo-600" />
               <div>
                 <span className="font-bold text-slate-800 dark:text-slate-200">
-                  {isLastSat ? 'Saturday Month-End Report' : 'Saturday Weekly Progress'}
+                  Saturday Progress
                 </span>
-                <div className="text-[10px] text-slate-500">Every Saturday after 1:30 PM</div>
+                <div className="text-[10px] text-slate-500">Sat 1:30 PM – EOD</div>
               </div>
             </div>
             <span
               className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                isSaturdaySummaryTime
+                isSaturdaySlot && !isMonthlySlot
                   ? 'bg-indigo-600 text-white'
                   : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
               }`}
             >
-              {isSaturdaySummaryTime ? 'Scheduled Ready' : 'Pending Schedule'}
+              {isSaturdaySlot && !isMonthlySlot ? 'Active' : 'Inactive'}
+            </span>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/40 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-purple-600" />
+              <div>
+                <span className="font-bold text-slate-800 dark:text-slate-200">
+                  Monthly Review
+                </span>
+                <div className="text-[10px] text-slate-500">Last Sat 1:30 PM – Month End</div>
+              </div>
+            </div>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                isMonthlySlot
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              {isMonthlySlot ? 'Active' : 'Inactive'}
             </span>
           </div>
         </div>

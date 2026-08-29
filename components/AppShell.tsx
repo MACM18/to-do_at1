@@ -204,6 +204,7 @@ export default function AppShell({
         {activeTab === 'TEAM_VIEW' && (
           <TeamViewTab
             currentUser={currentUser}
+            sessionUser={sessionUser}
             users={initialUsers}
             tasks={initialTasks}
             logs={initialLogs}

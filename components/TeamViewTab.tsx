@@ -22,10 +22,11 @@ import TaskModal from './TaskModal';
 import CompactTaskCreator from './CompactTaskCreator';
 import MonthlyReportModal from './MonthlyReportModal';
 import ExecutiveReportModal from './ExecutiveReportModal';
-import { getDayBounds, isLastSaturdayOfMonth } from '@/lib/time-utils';
+import { getDayBounds, getReportTimeSlots } from '@/lib/time-utils';
 
 interface TeamViewTabProps {
   currentUser: any;
+  sessionUser?: any;
   users: any[];
   tasks: any[];
   logs: any[];
@@ -33,14 +34,19 @@ interface TeamViewTabProps {
 
 export default function TeamViewTab({
   currentUser,
+  sessionUser,
   users,
   tasks,
   logs,
 }: TeamViewTabProps) {
+  const loggedInUserId = sessionUser?.id || currentUser?.id;
   const activeUsers = users.filter((u) => u.isActive);
-  const otherMembers = activeUsers.filter((u) => u.id !== currentUser.id);
+  const otherMembers = activeUsers.filter((u) => u.id !== loggedInUserId);
+  const defaultSelectedUser =
+    otherMembers[0] || activeUsers.find((u) => u.id !== loggedInUserId) || activeUsers[0];
+
   const [selectedUserId, setSelectedUserId] = useState<string>(
-    otherMembers[0]?.id || activeUsers[0]?.id || 'ALL'
+    defaultSelectedUser?.id || 'ALL'
   );
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isMonthlyModalOpen, setIsMonthlyModalOpen] = useState(false);
@@ -49,26 +55,12 @@ export default function TeamViewTab({
   const [editingTask, setEditingTask] = useState<any>(null);
 
   const { startOfDay: todayStart } = getDayBounds(new Date());
+  const { isMondaySlot, isSaturdaySlot, isMonthlySlot, isLastSaturday } = getReportTimeSlots(new Date());
 
-  // Check Colombo time for scheduled weekly report triggers
-  const now = new Date();
-  const formatter = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Colombo',
-    hour: 'numeric',
-    minute: 'numeric',
-    hour12: false,
-  });
-  const parts = formatter.formatToParts(now);
-  const hour = parseInt(parts.find((p) => p.type === 'hour')?.value || '0', 10);
-  const minute = parseInt(parts.find((p) => p.type === 'minute')?.value || '0', 10);
-  const currentMinutes = hour * 60 + minute;
-  const colomboDay = todayStart.getDay(); // 0 is Sunday, 1 is Monday, 6 is Saturday
-
-  const isMondayKickoffTime = colomboDay === 1 && currentMinutes >= 600; // Monday after 10:00 AM
-  const isSaturdaySummaryTime = colomboDay === 6 && currentMinutes >= 810; // Saturday after 1:30 PM (13:30)
-  const isLastSat = isLastSaturdayOfMonth(now);
-
-  const selectedUser = activeUsers.find((u) => u.id === selectedUserId) || activeUsers[0];
+  const selectedUser =
+    activeUsers.find((u) => u.id === selectedUserId) ||
+    defaultSelectedUser ||
+    activeUsers[0];
 
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter((t) => t.status === 'DONE').length;
@@ -266,109 +258,92 @@ export default function TeamViewTab({
                 Executive Team Reports
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Monday kickoff summaries & Saturday/Monthly progress reports
+                Manual reports generated during their scheduled weekly timeframes
               </p>
             </div>
 
-            {/* Scheduled Report Highlight: Monday Kickoff */}
-            {isMondayKickoffTime && (
-              <div className="p-3.5 rounded-2xl bg-blue-50/90 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" />
-                    <span>Monday Workplan Scheduled</span>
-                  </span>
-                  <span className="text-[10px] text-blue-600 font-semibold">&gt; 10:00 AM</span>
-                </div>
-                <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                  Ready to copy developer tasks and share with your manager.
-                </p>
+            {/* Scheduled Report Actions: Only visible during active slots */}
+            <div className="space-y-2">
+              {isMondaySlot && (
                 <button
                   onClick={() => {
                     setExecutiveReportType('MONDAY');
                     setIsExecutiveModalOpen(true);
                   }}
-                  className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                  className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all active:scale-98 shadow-sm"
                 >
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>Open Monday Kickoff Report</span>
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-white/20 text-white">
+                      <Calendar className="w-4 h-4" />
+                    </div>
+                    <div className="text-left">
+                      <div className="font-bold">Monday Developer Workplan</div>
+                      <div className="text-[10px] font-normal text-blue-100">
+                        Active: Monday 10:00 AM - EOD
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-white" />
                 </button>
-              </div>
-            )}
+              )}
 
-            {/* Scheduled Report Highlight: Saturday Progress */}
-            {isSaturdaySummaryTime && (
-              <div className="p-3.5 rounded-2xl bg-indigo-50/90 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-ping" />
-                    <span>{isLastSat ? 'Monthly Report Ready' : 'Saturday Progress Ready'}</span>
-                  </span>
-                  <span className="text-[10px] text-indigo-600 font-semibold">&gt; 1:30 PM</span>
-                </div>
-                <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                  {isLastSat
-                    ? 'Month-end deliverables, completion metrics & full-month breakdown.'
-                    : 'Weekly employee deliverables, completion rate & productivity metrics.'}
-                </p>
+              {isSaturdaySlot && !isMonthlySlot && (
                 <button
                   onClick={() => {
-                    setExecutiveReportType(isLastSat ? 'MONTHLY' : 'SATURDAY');
+                    setExecutiveReportType('SATURDAY');
                     setIsExecutiveModalOpen(true);
                   }}
-                  className="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                  className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all active:scale-98 shadow-sm"
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Open {isLastSat ? 'Monthly' : 'Saturday'} Report</span>
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-white/20 text-white">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                    <div className="text-left">
+                      <div className="font-bold">Saturday Weekly Progress Report</div>
+                      <div className="text-[10px] font-normal text-indigo-100">
+                        Active: Saturday 1:30 PM - EOD
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-white" />
                 </button>
-              </div>
-            )}
+              )}
 
-            {/* Report Actions */}
-            <div className="space-y-2">
-              <button
-                onClick={() => {
-                  setExecutiveReportType('MONDAY');
-                  setIsExecutiveModalOpen(true);
-                }}
-                className="w-full flex items-center justify-between p-3 rounded-2xl bg-blue-50/60 hover:bg-blue-100/80 dark:bg-blue-950/30 dark:hover:bg-blue-950/50 border border-blue-100 dark:border-blue-900/40 text-blue-900 dark:text-blue-200 text-xs font-bold transition-all active:scale-98 shadow-2xs"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-blue-600 text-white">
-                    <Calendar className="w-4 h-4" />
-                  </div>
-                  <div className="text-left">
-                    <div className="font-bold">Monday Developer Workplan</div>
-                    <div className="text-[10px] font-normal text-blue-700 dark:text-blue-400">
-                      Copy for Manager • PDF Export
+              {isMonthlySlot && (
+                <button
+                  onClick={() => {
+                    setExecutiveReportType('MONTHLY');
+                    setIsExecutiveModalOpen(true);
+                  }}
+                  className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all active:scale-98 shadow-sm"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-white/20 text-white">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                    <div className="text-left">
+                      <div className="font-bold">Monthly Team Progress Report</div>
+                      <div className="text-[10px] font-normal text-purple-100">
+                        Active: Last Sat 1:30 PM - Month End
+                      </div>
                     </div>
                   </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-blue-600" />
-              </button>
+                  <ChevronRight className="w-4 h-4 text-white" />
+                </button>
+              )}
 
-              <button
-                onClick={() => {
-                  setExecutiveReportType(isLastSat ? 'MONTHLY' : 'SATURDAY');
-                  setIsExecutiveModalOpen(true);
-                }}
-                className="w-full flex items-center justify-between p-3 rounded-2xl bg-indigo-50/60 hover:bg-indigo-100/80 dark:bg-indigo-950/30 dark:hover:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900/40 text-indigo-900 dark:text-indigo-200 text-xs font-bold transition-all active:scale-98 shadow-2xs"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-indigo-600 text-white">
-                    <CheckCircle2 className="w-4 h-4" />
+              {!isMondaySlot && !isSaturdaySlot && !isMonthlySlot && (
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 text-xs text-slate-500 space-y-1.5">
+                  <div className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Report Generation Schedule:</span>
                   </div>
-                  <div className="text-left">
-                    <div className="font-bold">
-                      {isLastSat ? 'Saturday Month-End Report' : 'Saturday Weekly Progress'}
-                    </div>
-                    <div className="text-[10px] font-normal text-indigo-700 dark:text-indigo-400">
-                      Progress Metrics • CSV • PDF
-                    </div>
-                  </div>
+                  <div className="text-[11px] pl-5">• Monday: 10:00 AM – End of Day</div>
+                  <div className="text-[11px] pl-5">• Saturday: 1:30 PM – End of Day</div>
+                  <div className="text-[11px] pl-5">• Monthly: Last Saturday 1:30 PM – Month End</div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-indigo-600" />
-              </button>
+              )}
 
               <button
                 onClick={() => setIsMonthlyModalOpen(true)}
