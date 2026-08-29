@@ -5,6 +5,10 @@ import { prisma } from '../prisma';
 import { getDayBounds } from '../time-utils';
 
 export async function getTodayMeetings(userId: string, targetDate?: Date) {
+  if (!prisma || !prisma.meetingLog) {
+    return [];
+  }
+
   const { startOfDay, endOfDay } = getDayBounds(targetDate || new Date());
 
   return prisma.meetingLog.findMany({

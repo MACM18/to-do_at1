@@ -11,6 +11,29 @@ import {
 import { initScheduler } from '../scheduler';
 
 export async function getConfig() {
+  if (!prisma || !prisma.appConfig) {
+    return {
+      id: 'global_config',
+      smtpHost: 'smtp.gmail.com',
+      smtpPort: 465,
+      smtpSecure: true,
+      smtpUser: '',
+      smtpPassword: '',
+      senderName: 'Daily Focus & Team Tracker',
+      emailRecipients: '',
+      toRecipients: '',
+      ccRecipients: '',
+      bccRecipients: '',
+      morningReportTime: '08:00',
+      eveningReportTime: '18:00',
+      shiftStartTime: '8.30',
+      prepEndTime: '8.45',
+      shiftEndTime: '5.30',
+      autoSendMorningReport: false,
+      autoSendDailyLog: false,
+    };
+  }
+
   let config = await prisma.appConfig.findUnique({
     where: { id: 'global_config' },
   });

@@ -43,23 +43,35 @@ function calculateTaskProgress(
 }
 
 export async function getTasks(userId?: string) {
-  await processRecurringTasks(userId);
+  try {
+    await processRecurringTasks(userId);
+  } catch (err) {
+    console.error('Error processing recurring tasks in getTasks:', err);
+  }
 
-  // If a main admin user exists, reassign any orphaned tasks from older versions
-  const mainUser = await prisma.user.findFirst({
-    where: { role: { in: ['ADMIN', 'LEAD'] } },
-    orderBy: { createdAt: 'asc' },
-  });
+  if (!prisma || !prisma.task || !prisma.user) {
+    return [];
+  }
 
-  if (mainUser) {
-    const validUsers = await prisma.user.findMany({ select: { id: true } });
-    const validUserIds = validUsers.map((u) => u.id);
-    await prisma.task.updateMany({
-      where: {
-        userId: { notIn: validUserIds },
-      },
-      data: { userId: mainUser.id },
+  try {
+    // If a main admin user exists, reassign any orphaned tasks from older versions
+    const mainUser = await prisma.user.findFirst({
+      where: { role: { in: ['ADMIN', 'LEAD'] } },
+      orderBy: { createdAt: 'asc' },
     });
+
+    if (mainUser) {
+      const validUsers = await prisma.user.findMany({ select: { id: true } });
+      const validUserIds = validUsers.map((u) => u.id);
+      await prisma.task.updateMany({
+        where: {
+          userId: { notIn: validUserIds },
+        },
+        data: { userId: mainUser.id },
+      });
+    }
+  } catch (err) {
+    console.error('Error reassigning orphaned tasks in getTasks:', err);
   }
 
   const whereClause = userId ? { userId } : {};

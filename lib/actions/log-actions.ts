@@ -4,6 +4,10 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '../prisma';
 
 export async function getDailyLogs(userId?: string) {
+  if (!prisma || !prisma.dailyLog) {
+    return [];
+  }
+
   const whereClause = userId ? { userId } : {};
 
   return prisma.dailyLog.findMany({
