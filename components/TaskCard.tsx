@@ -352,12 +352,27 @@ export default function TaskCard({
 
               {renderDueDateBadge(task.dueDate, isDone)}
 
-              {(task.startTime || task.endTime) && (
-                <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 font-mono shrink-0">
-                  <Clock className="w-2.5 h-2.5" />
-                  {task.startTime || '8.30'} - {task.endTime || 'Done'}
-                </span>
-              )}
+              {(task.startTime || task.endTime) ? (
+                onEdit ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(task);
+                    }}
+                    className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50/90 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 px-2 py-0.5 rounded-full font-mono shrink-0 transition-colors cursor-pointer border border-blue-200/60 dark:border-blue-800/80"
+                    title="Click to adjust start time or end time"
+                  >
+                    <Clock className="w-2.5 h-2.5 text-blue-500" />
+                    <span>{task.startTime || '8.30'} - {task.endTime || 'Done'}</span>
+                  </button>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 font-mono shrink-0">
+                    <Clock className="w-2.5 h-2.5" />
+                    {task.startTime || '8.30'} - {task.endTime || 'Done'}
+                  </span>
+                )
+              ) : null}
 
               {priority && (
                 <span className="text-[10px] font-medium text-slate-400 shrink-0">
@@ -503,11 +518,27 @@ export default function TaskCard({
 
                   {/* Timing or Quick Start Action */}
                   {task.startTime || task.endTime ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                      <Clock className="w-3 h-3 text-blue-500" />
-                      {task.startTime ? task.startTime : 'Start'}
-                      {task.endTime ? ` - ${task.endTime}` : ''}
-                    </span>
+                    onEdit ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEdit(task);
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-blue-950/60 text-slate-700 hover:text-blue-700 dark:text-slate-300 dark:hover:text-blue-300 border border-slate-200/60 hover:border-blue-300 dark:border-slate-700 transition-all cursor-pointer"
+                        title="Click to adjust start or end time"
+                      >
+                        <Clock className="w-3 h-3 text-blue-500" />
+                        <span>{task.startTime ? task.startTime : 'Start'}</span>
+                        <span>{task.endTime ? ` - ${task.endTime}` : ''}</span>
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                        <Clock className="w-3 h-3 text-blue-500" />
+                        <span>{task.startTime ? task.startTime : 'Start'}</span>
+                        <span>{task.endTime ? ` - ${task.endTime}` : ''}</span>
+                      </span>
+                    )
                   ) : !isDone ? (
                     <button
                       type="button"

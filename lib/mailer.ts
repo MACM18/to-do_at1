@@ -531,8 +531,8 @@ export async function sendMorningReportEmail(userId?: string, customCheckInTime?
         userId: targetUser.id,
         OR: [
           { status: { in: ['TODO', 'IN_PROGRESS'] } },
+          { recurrence: { in: ['DAILY', 'WEEKLY'] } },
           { createdAt: { gte: todayStart } },
-          { updatedAt: { gte: todayStart } },
         ],
       },
       include: {
@@ -717,9 +717,10 @@ export async function sendEveningSummaryEmail(
         tasks: {
           where: {
             OR: [
+              { status: { in: ['TODO', 'IN_PROGRESS'] } },
+              { recurrence: { in: ['DAILY', 'WEEKLY'] } },
               { createdAt: { gte: todayStart, lte: todayEnd } },
               { updatedAt: { gte: todayStart, lte: todayEnd } },
-              { status: { in: ['TODO', 'IN_PROGRESS', 'DONE'] } },
             ],
           },
           include: {

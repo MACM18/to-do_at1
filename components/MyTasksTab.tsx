@@ -110,7 +110,15 @@ export default function MyTasksTab({
       t.status !== 'IN_PROGRESS'
   );
 
-  const completedTasks = userTasks.filter((t) => t.status === 'DONE');
+  // Today's completed tasks (including recurring tasks completed today)
+  const completedTasks = userTasks.filter(
+    (t) =>
+      t.status === 'DONE' &&
+      (new Date(t.updatedAt) >= todayStart ||
+        new Date(t.createdAt) >= todayStart ||
+        t.recurrence === 'DAILY' ||
+        t.recurrence === 'WEEKLY')
+  );
 
   // Filter logic
   const filterList = (list: any[]) => {
@@ -368,7 +376,7 @@ export default function MyTasksTab({
               >
                 <div className="flex items-center gap-1.5">
                   <CheckCheck className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Completed Tasks ({filteredCompleted.length})</span>
+                  <span>Today&apos;s Completed Tasks ({filteredCompleted.length})</span>
                 </div>
                 {isCompletedExpanded ? (
                   <ChevronUp className="w-3.5 h-3.5" />

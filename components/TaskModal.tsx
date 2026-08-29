@@ -20,6 +20,7 @@ import {
   CalendarDays,
 } from 'lucide-react';
 import { createTask, updateTask } from '@/lib/actions/task-actions';
+import { getLocalTimeDot } from '@/lib/time-utils';
 
 interface UserOption {
   id: string;
@@ -433,31 +434,95 @@ export default function TaskModal({
               </div>
 
               {/* Start Time & End Time (for Evening Task Log) */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-blue-500" /> Start Time (Log)
-                  </label>
-                  <input
-                    type="text"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    placeholder="e.g., 8.45"
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                  />
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 space-y-3">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Work Timings (Asia/Colombo +05:30)</span>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-indigo-500" /> End Time (Log)
-                  </label>
-                  <input
-                    type="text"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    placeholder="e.g., 5.30"
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Start Time
+                    </label>
+                    <input
+                      type="text"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      placeholder="e.g., 8.30"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                    />
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setStartTime(getLocalTimeDot(new Date(), 'Asia/Colombo'))}
+                        className="px-1.5 py-0.5 text-[10px] font-bold rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 hover:bg-blue-200"
+                      >
+                        Now
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStartTime('8.30')}
+                        className="px-1.5 py-0.5 text-[10px] font-semibold rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300"
+                      >
+                        8.30
+                      </button>
+                      {startTime && (
+                        <button
+                          type="button"
+                          onClick={() => setStartTime('')}
+                          className="px-1.5 py-0.5 text-[10px] font-semibold rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      End Time
+                    </label>
+                    <input
+                      type="text"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      placeholder="e.g., 5.30"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                    />
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setEndTime(getLocalTimeDot(new Date(), 'Asia/Colombo'))}
+                        className="px-1.5 py-0.5 text-[10px] font-bold rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200"
+                      >
+                        Now
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEndTime('5.30')}
+                        className="px-1.5 py-0.5 text-[10px] font-semibold rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300"
+                      >
+                        5.30
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEndTime('1.30')}
+                        className="px-1.5 py-0.5 text-[10px] font-semibold rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300"
+                      >
+                        1.30
+                      </button>
+                      {endTime && (
+                        <button
+                          type="button"
+                          onClick={() => setEndTime('')}
+                          className="px-1.5 py-0.5 text-[10px] font-semibold rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 

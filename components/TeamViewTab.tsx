@@ -20,6 +20,7 @@ import TaskCard from './TaskCard';
 import TaskModal from './TaskModal';
 import CompactTaskCreator from './CompactTaskCreator';
 import MonthlyReportModal from './MonthlyReportModal';
+import { getDayBounds } from '@/lib/time-utils';
 
 interface TeamViewTabProps {
   currentUser: any;
@@ -40,8 +41,7 @@ export default function TeamViewTab({
   const [isMonthlyModalOpen, setIsMonthlyModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  const { startOfDay: todayStart } = getDayBounds(new Date());
 
   const selectedUser = activeUsers.find((u) => u.id === selectedUserId) || activeUsers[0];
 
@@ -58,7 +58,14 @@ export default function TeamViewTab({
   const memberActive = memberTasks.filter(
     (t) => new Date(t.createdAt) >= todayStart && t.status !== 'DONE'
   );
-  const memberCompleted = memberTasks.filter((t) => t.status === 'DONE');
+  const memberCompleted = memberTasks.filter(
+    (t) =>
+      t.status === 'DONE' &&
+      (new Date(t.updatedAt) >= todayStart ||
+        new Date(t.createdAt) >= todayStart ||
+        t.recurrence === 'DAILY' ||
+        t.recurrence === 'WEEKLY')
+  );
   const memberRate =
     memberTasks.length > 0 ? Math.round((memberCompleted.length / memberTasks.length) * 100) : 0;
 
@@ -203,7 +210,7 @@ export default function TeamViewTab({
             <div className="pt-3 border-t border-slate-200/80 dark:border-slate-800 space-y-2">
               <div className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Completed Tasks ({memberCompleted.length})</span>
+                <span>Today&apos;s Completed Tasks ({memberCompleted.length})</span>
               </div>
               <div className="space-y-1.5">
                 {memberCompleted.map((task) => (

@@ -1,12 +1,13 @@
 import { prisma } from './prisma';
+import { getDayBounds } from './time-utils';
 
 /**
  * Checks and resets recurring tasks (DAILY, WEEKLY) that were completed on previous days.
- * Resets task progress to 0, status to 'TODO', unchecks all subtasks, and marks lastResetDate.
+ * Resets task progress to 0, status to 'TODO', clears timing, unchecks subtasks, and updates lastResetDate.
  */
 export async function processRecurringTasks(userId?: string) {
+  const { startOfDay: startOfToday } = getDayBounds(new Date(), 'Asia/Colombo');
   const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   const whereClause: {
     recurrence: { in: string[] };
@@ -34,7 +35,7 @@ export async function processRecurringTasks(userId?: string) {
     let shouldReset = false;
 
     if (task.recurrence === 'DAILY') {
-      // If completed and the last update or reset was before today
+      // If completed and the last update or reset was before today (Asia/Colombo)
       if (isCompleted && (!lastReset || lastReset < startOfToday) && lastUpdate < startOfToday) {
         shouldReset = true;
       }
@@ -53,6 +54,8 @@ export async function processRecurringTasks(userId?: string) {
           data: {
             status: 'TODO',
             progress: 0,
+            startTime: null,
+            endTime: null,
             lastResetDate: now,
           },
         }),
