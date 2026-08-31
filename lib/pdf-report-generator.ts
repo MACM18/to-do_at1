@@ -165,7 +165,6 @@ export function generateMondayWorkplanPdf(mondayData: any) {
           'IN PROGRESS',
           t.title,
           `${Number(t.progress || 0).toFixed(0)}%`,
-          t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-US') : 'Ongoing',
         ]);
       });
     }
@@ -176,7 +175,6 @@ export function generateMondayWorkplanPdf(mondayData: any) {
           'BACKLOG',
           t.title,
           `${Number(t.progress || 0).toFixed(0)}%`,
-          t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-US') : 'Pending',
         ]);
       });
     }
@@ -187,18 +185,17 @@ export function generateMondayWorkplanPdf(mondayData: any) {
           'SCHEDULED',
           t.title,
           `${Number(t.progress || 0).toFixed(0)}%`,
-          t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-US') : 'Today',
         ]);
       });
     }
 
     if (taskRows.length === 0) {
-      taskRows.push(['STATUS', 'No active tasks pending', '-', '-']);
+      taskRows.push(['STATUS', 'No active tasks pending', '-']);
     }
 
     autoTable(doc, {
       startY: currentY,
-      head: [['Category', 'Task Deliverable', 'Progress', 'Target / Due']],
+      head: [['Category', 'Task Deliverable', 'Progress']],
       body: taskRows,
       theme: 'striped',
       headStyles: {
@@ -215,8 +212,7 @@ export function generateMondayWorkplanPdf(mondayData: any) {
       columnStyles: {
         0: { cellWidth: 28, fontStyle: 'bold' },
         1: { cellWidth: 'auto' },
-        2: { cellWidth: 20, halign: 'center' },
-        3: { cellWidth: 26, halign: 'center' },
+        2: { cellWidth: 24, halign: 'center' },
       },
       didParseCell: (data) => {
         if (data.section === 'body' && data.column.index === 0) {
@@ -394,7 +390,7 @@ export function generateSaturdayProgressPdf(saturdayData: any) {
     const taskRows: any[] = [];
 
     dev.completedTasks.forEach((t: any) => {
-      taskRows.push(['DONE', t.title, '100%', t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-US') : 'Done']);
+      taskRows.push(['DONE', t.title, '100%']);
     });
 
     dev.inProgressTasks.forEach((t: any) => {
@@ -402,7 +398,6 @@ export function generateSaturdayProgressPdf(saturdayData: any) {
         'IN PROGRESS',
         t.title,
         `${Number(t.progress || 0).toFixed(0)}%`,
-        t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-US') : 'Ongoing',
       ]);
     });
 
@@ -411,17 +406,16 @@ export function generateSaturdayProgressPdf(saturdayData: any) {
         'PENDING',
         t.title,
         '0%',
-        t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-US') : 'Backlog',
       ]);
     });
 
     if (taskRows.length === 0) {
-      taskRows.push(['-', 'No individual tasks recorded', '-', '-']);
+      taskRows.push(['-', 'No individual tasks recorded', '-']);
     }
 
     autoTable(doc, {
       startY: currentY,
-      head: [['Status', 'Deliverable Title', 'Progress %', 'Target / Due']],
+      head: [['Status', 'Deliverable Title', 'Progress %']],
       body: taskRows,
       theme: 'striped',
       headStyles: {
@@ -438,8 +432,7 @@ export function generateSaturdayProgressPdf(saturdayData: any) {
       columnStyles: {
         0: { cellWidth: 26, fontStyle: 'bold' },
         1: { cellWidth: 'auto' },
-        2: { cellWidth: 20, halign: 'center' },
-        3: { cellWidth: 26, halign: 'center' },
+        2: { cellWidth: 24, halign: 'center' },
       },
       didParseCell: (data) => {
         if (data.section === 'body' && data.column.index === 0) {
