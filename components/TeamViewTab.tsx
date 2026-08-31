@@ -17,9 +17,9 @@ import {
   Sparkles,
   Copy,
 } from 'lucide-react';
-import TaskCard from './TaskCard';
-import TaskModal from './TaskModal';
-import CompactTaskCreator from './CompactTaskCreator';
+import TeamTaskCard from './TeamTaskCard';
+import TeamTaskModal from './TeamTaskModal';
+import TeamTaskCreator from './TeamTaskCreator';
 import MonthlyReportModal from './MonthlyReportModal';
 import ExecutiveReportModal from './ExecutiveReportModal';
 import { getDayBounds, getReportTimeSlots } from '@/lib/time-utils';
@@ -162,7 +162,12 @@ export default function TeamViewTab({
           )}
 
           {/* Quick Assign Task Bar for Selected Member */}
-          {selectedUser && <CompactTaskCreator userId={selectedUser.id} />}
+          {selectedUser && (
+            <TeamTaskCreator
+              userId={selectedUser.id}
+              userName={selectedUser.name}
+            />
+          )}
 
           {/* Section 1: Member's Carry-Over Backlog */}
           {memberCarryOver.length > 0 && (
@@ -178,7 +183,7 @@ export default function TeamViewTab({
 
               <div className="space-y-2.5">
                 {memberCarryOver.map((task) => (
-                  <TaskCard
+                  <TeamTaskCard
                     key={task.id}
                     task={task}
                     isCarryOver={true}
@@ -204,7 +209,7 @@ export default function TeamViewTab({
             {memberActive.length > 0 ? (
               <div className="space-y-2.5">
                 {memberActive.map((task) => (
-                  <TaskCard
+                  <TeamTaskCard
                     key={task.id}
                     task={task}
                     isCarryOver={false}
@@ -231,7 +236,7 @@ export default function TeamViewTab({
               </div>
               <div className="space-y-1.5">
                 {memberCompleted.map((task) => (
-                  <TaskCard
+                  <TeamTaskCard
                     key={task.id}
                     task={task}
                     isCompactDone={true}
@@ -452,12 +457,15 @@ export default function TeamViewTab({
         </div>
       </div>
 
-      {/* Task Creation Modal */}
-      <TaskModal
+      {/* Team Task Creation & Edit Modal */}
+      <TeamTaskModal
         isOpen={isTaskModalOpen}
-        onClose={() => setIsTaskModalOpen(false)}
-        users={activeUsers}
-        currentUserId={selectedUserId !== 'ALL' ? selectedUserId : currentUser.id}
+        onClose={() => {
+          setIsTaskModalOpen(false);
+          setEditingTask(null);
+        }}
+        userId={selectedUser?.id || currentUser.id}
+        userName={selectedUser?.name}
         editingTask={editingTask}
       />
 

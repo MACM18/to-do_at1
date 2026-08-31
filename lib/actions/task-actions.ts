@@ -94,6 +94,8 @@ export async function getTasks(userId?: string) {
 export async function createTask(formData: {
   title: string;
   description?: string;
+  status?: string;
+  progress?: number;
   recurrence?: string;
   userId: string;
   dueDate?: string | Date | null;
@@ -128,7 +130,14 @@ export async function createTask(formData: {
       }));
   }
 
-  const { progress, status } = calculateTaskProgress(subtasksData);
+  let initialProgress = formData.progress ?? 0;
+  let initialStatus = formData.status ?? 'TODO';
+
+  if (subtasksData.length > 0) {
+    const calculated = calculateTaskProgress(subtasksData);
+    initialProgress = calculated.progress;
+    initialStatus = calculated.status;
+  }
 
   const task = await prisma.task.create({
     data: {
@@ -137,12 +146,12 @@ export async function createTask(formData: {
       recurrence: formData.recurrence || 'NONE',
       userId: formData.userId,
       dueDate: formData.dueDate ? new Date(formData.dueDate) : null,
-      startTime: formData.startTime?.trim() || (formData.recurrence === 'DAILY' ? '8.30' : null),
+      startTime: formData.startTime?.trim() || (formData.recurrence === 'DAILY' ? '08.30' : null),
       endTime: formData.endTime?.trim() || null,
       priority: formData.priority || 'High',
       assignedBy: formData.assignedBy?.trim() || 'Myself',
-      status: status,
-      progress: progress,
+      status: initialStatus,
+      progress: initialProgress,
       subtasks: {
         create: subtasksData,
       },
@@ -261,6 +270,49 @@ export async function updateTask(
 
   revalidatePath('/');
   return task;
+}
+
+/**
+ * Fast direct progress & status update for team member tracking
+ * Allows the manager to update a team task's status and progress percentage in 1 click
+ */
+export async function updateTeamTaskStatusAndProgress(
+  taskId: string,
+  progress: number,
+  status?: string
+) {
+  const clampedProgress = Math.max(0, Math.min(100, Math.round(progress)));
+  let resolvedStatus = status;
+
+  if (!resolvedStatus) {
+    if (clampedProgress >= 100) {
+      resolvedStatus = 'DONE';
+    } else if (clampedProgress > 0) {
+      resolvedStatus = 'IN_PROGRESS';
+    } else {
+      resolvedStatus = 'TODO';
+    }
+  } else {
+    if (resolvedStatus === 'DONE' && clampedProgress < 100) {
+      // If marked done, set progress to 100
+      progress = 100;
+    } else if (resolvedStatus === 'TODO' && clampedProgress > 0) {
+      progress = 0;
+    }
+  }
+
+  const finalProgress = resolvedStatus === 'DONE' ? 100 : (resolvedStatus === 'TODO' && !status ? 0 : clampedProgress);
+
+  const updated = await prisma.task.update({
+    where: { id: taskId },
+    data: {
+      progress: finalProgress,
+      status: resolvedStatus,
+    },
+  });
+
+  revalidatePath('/');
+  return updated;
 }
 
 function getCurrentDotTime(): string {
@@ -645,21 +697,21 @@ export async function getMondayWorkplanReportData() {
     if (dev.ongoing.length > 0) {
       textSummary += `▶ ONGOING / IN PROGRESS (${dev.ongoing.length}):\n`;
       dev.ongoing.forEach((t) => {
-        textSummary += `  • [${t.priority}] ${t.title} (${Number(t.progress || 0).toFixed(0)}% done${t.startTime ? `, Started: ${t.startTime}` : ''})\n`;
+        textSummary += `  • ${t.title} (${Number(t.progress || 0).toFixed(0)}% done)\n`;
       });
     }
 
     if (dev.carryOver.length > 0) {
       textSummary += `⏳ PENDING BACKLOG (${dev.carryOver.length}):\n`;
       dev.carryOver.forEach((t) => {
-        textSummary += `  • [${t.priority}] ${t.title}${t.dueDate ? ` (Due: ${new Date(t.dueDate).toLocaleDateString('en-US')})` : ''}\n`;
+        textSummary += `  • ${t.title}${t.dueDate ? ` (Due: ${new Date(t.dueDate).toLocaleDateString('en-US')})` : ''}\n`;
       });
     }
 
     if (dev.activeToday.length > 0) {
       textSummary += `📋 SCHEDULED TODAY (${dev.activeToday.length}):\n`;
       dev.activeToday.forEach((t) => {
-        textSummary += `  • [${t.priority}] ${t.title}\n`;
+        textSummary += `  • ${t.title}\n`;
       });
     }
 

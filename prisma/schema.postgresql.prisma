@@ -121,9 +121,9 @@ model AppConfig {
   bccRecipients         String   @default("") // Comma-separated BCC
   morningReportTime     String   @default("08:00") // HH:MM
   eveningReportTime     String   @default("18:00") // HH:MM
-  shiftStartTime        String   @default("8.30")
-  prepEndTime           String   @default("8.45")
-  shiftEndTime          String   @default("5.30")
+  shiftStartTime        String   @default("08.30")
+  prepEndTime           String   @default("08.45")
+  shiftEndTime          String   @default("17.30")
   autoSendMorningReport Boolean  @default(false)
   autoSendDailyLog      Boolean  @default(false)
   defaultUserId         String?
