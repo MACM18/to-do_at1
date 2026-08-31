@@ -188,6 +188,7 @@ export default function TeamViewTab({
                   <TeamTaskCard
                     key={task.id}
                     task={task}
+                    users={activeUsers}
                     isCarryOver={true}
                     onEdit={(t) => {
                       setEditingTask(t);
@@ -214,6 +215,7 @@ export default function TeamViewTab({
                   <TeamTaskCard
                     key={task.id}
                     task={task}
+                    users={activeUsers}
                     isCarryOver={false}
                     onEdit={(t) => {
                       setEditingTask(t);
@@ -241,6 +243,7 @@ export default function TeamViewTab({
                   <TeamTaskCard
                     key={task.id}
                     task={task}
+                    users={activeUsers}
                     isCompactDone={true}
                     onEdit={(t) => {
                       setEditingTask(t);
@@ -485,6 +488,7 @@ export default function TeamViewTab({
         }}
         userId={selectedUser?.id || currentUser.id}
         userName={selectedUser?.name}
+        users={activeUsers}
         editingTask={editingTask}
       />
 

@@ -13,8 +13,9 @@ import {
   Flame,
   Check,
   Percent,
+  UserCheck,
 } from 'lucide-react';
-import { updateTeamTaskStatusAndProgress, deleteTask } from '@/lib/actions/task-actions';
+import { updateTeamTaskStatusAndProgress, deleteTask, reassignTeamTask } from '@/lib/actions/task-actions';
 import ConfirmDialog from './ConfirmDialog';
 import confetti from 'canvas-confetti';
 
@@ -33,6 +34,7 @@ interface Task {
 
 interface TeamTaskCardProps {
   task: Task;
+  users?: any[];
   isCarryOver?: boolean;
   isCompactDone?: boolean;
   onEdit?: (task: Task) => void;
@@ -101,6 +103,7 @@ function renderDueDateBadge(dueDate: Date | string | null | undefined, isDone: b
 
 export default function TeamTaskCard({
   task,
+  users,
   isCarryOver = false,
   isCompactDone = false,
   onEdit,
@@ -132,6 +135,13 @@ export default function TeamTaskCard({
     });
   };
 
+  const handleReassign = (newUserId: string) => {
+    if (!newUserId || newUserId === task.userId) return;
+    startTransition(async () => {
+      await reassignTeamTask(task.id, newUserId);
+    });
+  };
+
   const handleDelete = () => {
     startTransition(async () => {
       await deleteTask(task.id);
@@ -159,6 +169,21 @@ export default function TeamTaskCard({
         </div>
 
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          {users && users.length > 1 && (
+            <select
+              value={task.userId}
+              disabled={isPending}
+              onChange={(e) => handleReassign(e.target.value)}
+              className="px-1.5 py-0.5 text-[10px] font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 focus:outline-none cursor-pointer max-w-[110px] truncate mr-1"
+              title="Change task owner"
+            >
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+          )}
           {onEdit && (
             <button
               onClick={() => onEdit(task)}
@@ -327,6 +352,29 @@ export default function TeamTaskCard({
               );
             })}
           </div>
+
+          {/* Quick Member / Owner Reassignment Selector */}
+          {users && users.length > 1 && (
+            <div className="pt-2.5 mt-1 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
+              <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                <UserCheck className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Reassign Owner:</span>
+              </span>
+              <select
+                value={task.userId}
+                disabled={isPending}
+                onChange={(e) => handleReassign(e.target.value)}
+                className="px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/70 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer max-w-[170px] truncate transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+                title="Reassign task to another team member"
+              >
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} {u.id === task.userId ? '(Current)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 

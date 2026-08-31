@@ -170,6 +170,7 @@ export async function updateTask(
   data: {
     title?: string;
     description?: string | null;
+    userId?: string;
     recurrence?: string;
     status?: string;
     progress?: number;
@@ -189,6 +190,7 @@ export async function updateTask(
   const updatePayload: any = {};
   if (data.title !== undefined) updatePayload.title = data.title.trim();
   if (data.description !== undefined) updatePayload.description = data.description?.trim() || null;
+  if (data.userId !== undefined && data.userId.trim()) updatePayload.userId = data.userId.trim();
   if (data.recurrence !== undefined) updatePayload.recurrence = data.recurrence;
   if (data.status !== undefined) updatePayload.status = data.status;
   if (data.progress !== undefined) updatePayload.progress = data.progress;
@@ -309,6 +311,24 @@ export async function updateTeamTaskStatusAndProgress(
       progress: finalProgress,
       status: resolvedStatus,
     },
+  });
+
+  revalidatePath('/');
+  return updated;
+}
+
+/**
+ * Fast task reassignment / owner transfer for team member tracking
+ * In case a task was accidentally logged under the wrong member
+ */
+export async function reassignTeamTask(taskId: string, newUserId: string) {
+  if (!taskId || !newUserId) {
+    throw new Error('Task ID and target team member ID are required');
+  }
+
+  const updated = await prisma.task.update({
+    where: { id: taskId },
+    data: { userId: newUserId },
   });
 
   revalidatePath('/');

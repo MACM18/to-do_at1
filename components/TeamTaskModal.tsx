@@ -18,6 +18,7 @@ interface TeamTaskModalProps {
   onClose: () => void;
   userId: string;
   userName?: string;
+  users?: any[];
   editingTask?: any;
 }
 
@@ -26,6 +27,7 @@ export default function TeamTaskModal({
   onClose,
   userId,
   userName,
+  users = [],
   editingTask,
 }: TeamTaskModalProps) {
   const [title, setTitle] = useState('');
@@ -33,6 +35,7 @@ export default function TeamTaskModal({
   const [status, setStatus] = useState('TODO');
   const [progress, setProgress] = useState(0);
   const [dueDate, setDueDate] = useState('');
+  const [assignedUserId, setAssignedUserId] = useState(userId);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -41,6 +44,7 @@ export default function TeamTaskModal({
       setDescription(editingTask.description || '');
       setStatus(editingTask.status || 'TODO');
       setProgress(editingTask.progress || 0);
+      setAssignedUserId(editingTask.userId || userId);
       setDueDate(
         editingTask.dueDate
           ? new Date(editingTask.dueDate).toISOString().split('T')[0]
@@ -52,8 +56,9 @@ export default function TeamTaskModal({
       setStatus('TODO');
       setProgress(0);
       setDueDate('');
+      setAssignedUserId(userId);
     }
-  }, [editingTask, isOpen]);
+  }, [editingTask, isOpen, userId]);
 
   if (!isOpen) return null;
 
@@ -93,6 +98,7 @@ export default function TeamTaskModal({
           description: description.trim() || undefined,
           status,
           progress,
+          userId: assignedUserId,
           dueDate: resolvedDate,
         });
       } else {
@@ -102,7 +108,7 @@ export default function TeamTaskModal({
           status,
           progress,
           dueDate: resolvedDate || undefined,
-          userId,
+          userId: assignedUserId,
           priority: 'High',
           assignedBy: 'Myself',
           recurrence: 'NONE',
@@ -158,6 +164,26 @@ export default function TeamTaskModal({
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
+
+          {/* Assigned Team Member (Owner) */}
+          {users && users.length > 0 && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Assigned Team Member (Owner)
+              </label>
+              <select
+                value={assignedUserId}
+                onChange={(e) => setAssignedUserId(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+              >
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} {u.role ? `(${u.role})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Description */}
           <div>
