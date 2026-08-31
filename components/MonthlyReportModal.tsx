@@ -16,6 +16,7 @@ import {
   Check,
 } from 'lucide-react';
 import { getMonthlyReportData } from '@/lib/actions/task-actions';
+import { autoSaveGeneratedReport } from '@/lib/actions/report-actions';
 import { generateMonthlyReportPdf } from '@/lib/pdf-report-generator';
 
 interface MonthlyReportModalProps {
@@ -66,6 +67,41 @@ export default function MonthlyReportModal({
           userId: selectedUserId,
         });
         setReportData(data);
+
+        // Auto-archive monthly report
+        if (data && data.tasks && data.tasks.length > 0) {
+          const monthLabel = months.find((m) => m.value === selectedMonth)?.label || '';
+          const memberLabel =
+            selectedUserId === 'ALL'
+              ? 'All Members'
+              : users.find((u) => u.id === selectedUserId)?.name || 'Member';
+          const periodStr = `${monthLabel} ${selectedYear} (${memberLabel})`;
+
+          const completionRateStr =
+            data.summary && data.summary.totalTasks > 0
+              ? ((data.summary.completedTasks / data.summary.totalTasks) * 100).toFixed(1)
+              : '0.0';
+
+          let summaryText = `*MONTHLY TEAM TASK REPORT*\nPeriod: ${periodStr}\n`;
+          if (data.summary) {
+            summaryText += `Total Tasks: ${data.summary.totalTasks} | Completed: ${data.summary.completedTasks} | In Progress: ${data.summary.inProgressTasks}\n`;
+            summaryText += `Completion Rate: ${completionRateStr}% | Avg Productivity: ${data.summary.averageProductivity || '0.00'}%\n`;
+          }
+          summaryText += `========================================\nGenerated via To-Do MACM`;
+
+          await autoSaveGeneratedReport({
+            type: 'MONTHLY_SUMMARY',
+            title: `Monthly Report (${monthLabel} ${selectedYear})`,
+            period: periodStr,
+            summaryText,
+            reportData: data,
+            totalTasks: data.summary?.totalTasks || 0,
+            completedCount: data.summary?.completedTasks || 0,
+            inProgressCount: data.summary?.inProgressTasks || 0,
+            pendingCount: data.summary?.pendingTasks || 0,
+            completionRate: parseFloat(completionRateStr) || 0,
+          });
+        }
       } catch (err: any) {
         console.error(err);
       }
@@ -93,21 +129,26 @@ export default function MonthlyReportModal({
         ? 'All Team Members'
         : users.find((u) => u.id === selectedUserId)?.name || 'Member';
 
+    const completionRateStr =
+      reportData.summary && reportData.summary.totalTasks > 0
+        ? ((reportData.summary.completedTasks / reportData.summary.totalTasks) * 100).toFixed(1)
+        : '0.0';
+
     let text = `*MONTHLY TEAM TASK REPORT*\nPeriod: ${monthName} ${selectedYear} (${selectedMemberName})\n`;
     if (reportData.summary) {
       text += `Total Tasks: ${reportData.summary.totalTasks} | Completed: ${reportData.summary.completedTasks} | In Progress: ${reportData.summary.inProgressTasks}\n`;
-      text += `Completion Rate: ${reportData.summary.completionRate}% | Avg Productivity: ${reportData.summary.avgProductivity}%\n`;
+      text += `Completion Rate: ${completionRateStr}% | Avg Productivity: ${reportData.summary.averageProductivity || '0.00'}%\n`;
     }
     text += `========================================\n\n`;
 
     if (reportData.userSummaries && reportData.userSummaries.length > 0) {
       reportData.userSummaries.forEach((u: any) => {
-        text += `👤 *${u.name.toUpperCase()}* — ${u.completionRate}% Done (Productivity: ${u.avgProductivity}%)\n`;
+        text += `*${u.name.toUpperCase()}* — ${u.completionRate || 0}% Done (Productivity: ${u.avgProductivity || '0.00'}%)\n`;
         text += `Deliverables: ${u.totalTasks} Total (${u.completedTasks} Completed, ${u.inProgressTasks} In Progress)\n\n`;
       });
     }
 
-    text += `========================================\nGenerated via Daily Focus & Team Tracker`;
+    text += `========================================\nGenerated via To-Do MACM`;
 
     try {
       await navigator.clipboard.writeText(text);

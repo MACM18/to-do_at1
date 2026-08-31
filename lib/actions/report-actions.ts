@@ -8,9 +8,9 @@ import {
 } from './task-actions';
 
 /**
- * Saves a newly generated report to the archive
+ * Automatically logs a generated report to the archive (upserting for current date/period)
  */
-export async function saveReport(data: {
+export async function autoSaveGeneratedReport(data: {
   type: string; // MONDAY_KICKOFF, SATURDAY_PROGRESS, MONTHLY_SUMMARY
   title: string;
   period: string;
@@ -24,6 +24,37 @@ export async function saveReport(data: {
   pendingCount?: number;
   completionRate?: number;
 }) {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const existingToday = await prisma.savedReport.findFirst({
+    where: {
+      type: data.type,
+      period: data.period,
+      createdAt: { gte: todayStart },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (existingToday) {
+    const updated = await prisma.savedReport.update({
+      where: { id: existingToday.id },
+      data: {
+        title: data.title,
+        summaryText: data.summaryText,
+        reportData: typeof data.reportData === 'string' ? data.reportData : JSON.stringify(data.reportData),
+        totalTasks: data.totalTasks ?? existingToday.totalTasks,
+        completedCount: data.completedCount ?? existingToday.completedCount,
+        inProgressCount: data.inProgressCount ?? existingToday.inProgressCount,
+        pendingCount: data.pendingCount ?? existingToday.pendingCount,
+        completionRate: data.completionRate ?? existingToday.completionRate,
+        updatedAt: new Date(),
+      },
+    });
+    revalidatePath('/');
+    return updated;
+  }
+
   const report = await prisma.savedReport.create({
     data: {
       type: data.type,
@@ -43,6 +74,26 @@ export async function saveReport(data: {
 
   revalidatePath('/');
   return report;
+}
+
+/**
+ * Saves a newly generated report to the archive
+ */
+export async function saveReport(data: {
+  type: string; // MONDAY_KICKOFF, SATURDAY_PROGRESS, MONTHLY_SUMMARY
+  title: string;
+  period: string;
+  createdById?: string | null;
+  createdByName?: string | null;
+  summaryText: string;
+  reportData: any;
+  totalTasks?: number;
+  completedCount?: number;
+  inProgressCount?: number;
+  pendingCount?: number;
+  completionRate?: number;
+}) {
+  return autoSaveGeneratedReport(data);
 }
 
 /**

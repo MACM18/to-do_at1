@@ -711,27 +711,27 @@ export async function getMondayWorkplanReportData() {
   let textSummary = `*TEAM WORKPLAN & TASK REPORT*\nDate: ${dateStr}\n========================================\n\n`;
 
   developersWorkplan.forEach((dev) => {
-    textSummary += `👤 *${dev.name.toUpperCase()}*\n`;
+    textSummary += `*${dev.name.toUpperCase()}*\n`;
     textSummary += `Total Active Items: ${dev.totalActive}\n`;
 
     if (dev.ongoing.length > 0) {
-      textSummary += `▶ IN PROGRESS (${dev.ongoing.length}):\n`;
+      textSummary += `IN PROGRESS (${dev.ongoing.length}):\n`;
       dev.ongoing.forEach((t) => {
-        textSummary += `  • ${t.title} (${Number(t.progress || 0).toFixed(0)}% done)\n`;
+        textSummary += `  - ${t.title} (${Number(t.progress || 0).toFixed(0)}% done)\n`;
       });
     }
 
     if (dev.carryOver.length > 0) {
-      textSummary += `⏳ PENDING BACKLOG (${dev.carryOver.length}):\n`;
+      textSummary += `PENDING BACKLOG (${dev.carryOver.length}):\n`;
       dev.carryOver.forEach((t) => {
-        textSummary += `  • ${t.title}${t.dueDate ? ` (Due: ${new Date(t.dueDate).toLocaleDateString('en-US')})` : ''}\n`;
+        textSummary += `  - ${t.title}${t.dueDate ? ` (Due: ${new Date(t.dueDate).toLocaleDateString('en-US')})` : ''}\n`;
       });
     }
 
     if (dev.activeToday.length > 0) {
-      textSummary += `📋 SCHEDULED TODAY (${dev.activeToday.length}):\n`;
+      textSummary += `SCHEDULED TODAY (${dev.activeToday.length}):\n`;
       dev.activeToday.forEach((t) => {
-        textSummary += `  • ${t.title}\n`;
+        textSummary += `  - ${t.title}\n`;
       });
     }
 
@@ -740,21 +740,67 @@ export async function getMondayWorkplanReportData() {
     }
 
     if (dev.blockers) {
-      textSummary += `⚠️ Blocker: ${dev.blockers}\n`;
+      textSummary += `Blocker Note: ${dev.blockers}\n`;
     }
 
     textSummary += `\n`;
   });
 
-  textSummary += `========================================\nGenerated via Daily Focus & Team Tracker`;
+  textSummary += `========================================\nGenerated via To-Do MACM`;
 
-  return {
+  const reportPayload = {
     dateStr,
     developers: developersWorkplan,
     textSummary,
     totalDevelopers: activeUsers.length,
     totalActiveTasks: developersWorkplan.reduce((sum, d) => sum + d.totalActive, 0),
   };
+
+  // Automatically log to reports archive
+  try {
+    const todayStartOfDay = new Date();
+    todayStartOfDay.setHours(0, 0, 0, 0);
+    const existing = await prisma.savedReport.findFirst({
+      where: {
+        type: 'MONDAY_KICKOFF',
+        period: dateStr,
+        createdAt: { gte: todayStartOfDay },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (existing) {
+      await prisma.savedReport.update({
+        where: { id: existing.id },
+        data: {
+          title: `Monday Workplan (${dateStr})`,
+          summaryText: textSummary,
+          reportData: JSON.stringify(reportPayload),
+          totalTasks: reportPayload.totalActiveTasks,
+          updatedAt: new Date(),
+        },
+      });
+    } else {
+      await prisma.savedReport.create({
+        data: {
+          type: 'MONDAY_KICKOFF',
+          title: `Monday Workplan (${dateStr})`,
+          period: dateStr,
+          summaryText: textSummary,
+          reportData: JSON.stringify(reportPayload),
+          totalTasks: reportPayload.totalActiveTasks,
+          completedCount: 0,
+          inProgressCount: developersWorkplan.reduce((sum, d) => sum + d.ongoing.length, 0),
+          pendingCount: developersWorkplan.reduce((sum, d) => sum + d.carryOver.length + d.activeToday.length, 0),
+          completionRate: 0,
+        },
+      });
+    }
+  } catch (err) {
+    console.error('Auto-archiving Monday report failed', err);
+  }
+
+  return reportPayload;
 }
 
 /**
@@ -871,36 +917,36 @@ export async function getSaturdayProgressReportData(forcePeriod?: 'WEEKLY' | 'MO
   textSummary += `========================================\n\n`;
 
   developersBreakdown.forEach((dev) => {
-    textSummary += `👤 *${dev.name.toUpperCase()}* — ${dev.completionRate}% Done (Productivity: ${dev.productivityScore}%)\n`;
+    textSummary += `*${dev.name.toUpperCase()}* — ${dev.completionRate}% Done (Productivity: ${dev.productivityScore}%)\n`;
     textSummary += `Deliverables: ${dev.totalTasks} Total (${dev.completedTasks.length} Done, ${dev.inProgressTasks.length} In Progress, ${dev.pendingTasks.length} Pending) | ${dev.meetings.length} Meetings\n`;
 
     if (dev.completedTasks.length > 0) {
-      textSummary += `  ✓ Completed Deliverables (${dev.completedTasks.length}):\n`;
+      textSummary += `  COMPLETED DELIVERABLES (${dev.completedTasks.length}):\n`;
       dev.completedTasks.forEach((t) => {
-        textSummary += `    • ${t.title}\n`;
+        textSummary += `    - ${t.title}\n`;
       });
     }
 
     if (dev.inProgressTasks.length > 0) {
-      textSummary += `  ▶ In-Progress Items (${dev.inProgressTasks.length}):\n`;
+      textSummary += `  IN-PROGRESS ITEMS (${dev.inProgressTasks.length}):\n`;
       dev.inProgressTasks.forEach((t) => {
-        textSummary += `    • ${t.title} (${Number(t.progress || 0).toFixed(0)}% done)\n`;
+        textSummary += `    - ${t.title} (${Number(t.progress || 0).toFixed(0)}% done)\n`;
       });
     }
 
     if (dev.pendingTasks.length > 0) {
-      textSummary += `  ⏳ Pending Backlog (${dev.pendingTasks.length}):\n`;
+      textSummary += `  PENDING BACKLOG (${dev.pendingTasks.length}):\n`;
       dev.pendingTasks.forEach((t) => {
-        textSummary += `    • ${t.title}${t.dueDate ? ` (Due: ${new Date(t.dueDate).toLocaleDateString('en-US')})` : ''}\n`;
+        textSummary += `    - ${t.title}${t.dueDate ? ` (Due: ${new Date(t.dueDate).toLocaleDateString('en-US')})` : ''}\n`;
       });
     }
 
     textSummary += `\n`;
   });
 
-  textSummary += `========================================\nGenerated via Daily Focus & Team Tracker`;
+  textSummary += `========================================\nGenerated via To-Do MACM`;
 
-  return {
+  const reportPayload = {
     isMonthly,
     isLastSaturday: isLastSat,
     periodTitle,
@@ -918,4 +964,55 @@ export async function getSaturdayProgressReportData(forcePeriod?: 'WEEKLY' | 'MO
     developers: developersBreakdown,
     textSummary,
   };
+
+  // Automatically log to reports archive
+  try {
+    const todayStartOfDay = new Date();
+    todayStartOfDay.setHours(0, 0, 0, 0);
+    const reportType = isMonthly ? 'MONTHLY_SUMMARY' : 'SATURDAY_PROGRESS';
+    const existing = await prisma.savedReport.findFirst({
+      where: {
+        type: reportType,
+        period: periodTitle,
+        createdAt: { gte: todayStartOfDay },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (existing) {
+      await prisma.savedReport.update({
+        where: { id: existing.id },
+        data: {
+          title: `${isMonthly ? 'Monthly' : 'Weekly'} Progress (${periodTitle})`,
+          summaryText: textSummary,
+          reportData: JSON.stringify(reportPayload),
+          totalTasks,
+          completedCount: totalCompleted,
+          inProgressCount: totalInProgress,
+          pendingCount: totalPending,
+          completionRate: parseFloat(overallTeamCompletionRate) || 0,
+          updatedAt: new Date(),
+        },
+      });
+    } else {
+      await prisma.savedReport.create({
+        data: {
+          type: reportType,
+          title: `${isMonthly ? 'Monthly' : 'Weekly'} Progress (${periodTitle})`,
+          period: periodTitle,
+          summaryText: textSummary,
+          reportData: JSON.stringify(reportPayload),
+          totalTasks,
+          completedCount: totalCompleted,
+          inProgressCount: totalInProgress,
+          pendingCount: totalPending,
+          completionRate: parseFloat(overallTeamCompletionRate) || 0,
+        },
+      });
+    }
+  } catch (err) {
+    console.error('Auto-archiving Saturday report failed', err);
+  }
+
+  return reportPayload;
 }

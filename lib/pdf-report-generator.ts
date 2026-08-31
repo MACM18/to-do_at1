@@ -69,7 +69,7 @@ function addPdfFooter(doc: jsPDF) {
     doc.setFontSize(8);
     doc.setTextColor(148, 163, 184); // Slate-400
     doc.setFont('helvetica', 'normal');
-    doc.text('To-Do MACM • Confidential Report', 14, pageHeight - 7);
+    doc.text('Executive Report • Confidential', 14, pageHeight - 7);
     doc.text(`Page ${i} of ${totalPages}`, pageWidth - 14, pageHeight - 7, { align: 'right' });
   }
 }
@@ -150,7 +150,7 @@ export function generateMondayWorkplanPdf(mondayData: any) {
     doc.setFontSize(10);
     doc.setTextColor(30, 41, 59);
     doc.text(
-      `👤 ${dev.name.toUpperCase()}  •  ${dev.totalActive} Active Items`,
+      `${dev.name.toUpperCase()}  •  ${dev.totalActive} Active Items`,
       18,
       currentY + 5.5
     );
@@ -239,7 +239,7 @@ export function generateMondayWorkplanPdf(mondayData: any) {
       doc.setFont('helvetica', 'bolditalic');
       doc.setFontSize(8);
       doc.setTextColor(225, 29, 72); // Rose-600
-      doc.text(`⚠️ Blocker Note: ${dev.blockers}`, 16, currentY);
+      doc.text(`Blocker Note: ${dev.blockers}`, 16, currentY);
       currentY += 5;
     }
 
@@ -384,7 +384,7 @@ export function generateSaturdayProgressPdf(saturdayData: any) {
     doc.setFontSize(9.5);
     doc.setTextColor(30, 41, 59);
     doc.text(
-      `👤 ${dev.name.toUpperCase()}  —  ${dev.completionRate}% Done (Score: ${dev.productivityScore}%)`,
+      `${dev.name.toUpperCase()}  —  ${dev.completionRate}% Done (Score: ${dev.productivityScore}%)`,
       18,
       currentY + 5.5
     );
