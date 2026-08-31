@@ -12,8 +12,11 @@ import {
   Loader2,
   Download,
   Filter,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { getMonthlyReportData } from '@/lib/actions/task-actions';
+import { generateMonthlyReportPdf } from '@/lib/pdf-report-generator';
 
 interface MonthlyReportModalProps {
   isOpen: boolean;
@@ -33,6 +36,7 @@ export default function MonthlyReportModal({
   const [selectedMonth, setSelectedMonth] = useState<number>(currentDate.getMonth() + 1);
   const [selectedUserId, setSelectedUserId] = useState<string>(initialUserId);
   const [reportData, setReportData] = useState<any>(null);
+  const [copied, setCopied] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -75,6 +79,44 @@ export default function MonthlyReportModal({
   }, [isOpen, selectedYear, selectedMonth, selectedUserId]);
 
   if (!isOpen) return null;
+
+  // Copy Formatted Text to Clipboard for Manager
+  const handleCopyClipboard = async () => {
+    if (!reportData || !reportData.tasks || reportData.tasks.length === 0) {
+      setStatusMessage({ type: 'error', text: 'No task records to copy.' });
+      return;
+    }
+
+    const monthName = months.find((m) => m.value === selectedMonth)?.label || '';
+    const selectedMemberName =
+      selectedUserId === 'ALL'
+        ? 'All Team Members'
+        : users.find((u) => u.id === selectedUserId)?.name || 'Member';
+
+    let text = `*MONTHLY TEAM TASK REPORT*\nPeriod: ${monthName} ${selectedYear} (${selectedMemberName})\n`;
+    if (reportData.summary) {
+      text += `Total Tasks: ${reportData.summary.totalTasks} | Completed: ${reportData.summary.completedTasks} | In Progress: ${reportData.summary.inProgressTasks}\n`;
+      text += `Completion Rate: ${reportData.summary.completionRate}% | Avg Productivity: ${reportData.summary.avgProductivity}%\n`;
+    }
+    text += `========================================\n\n`;
+
+    if (reportData.userSummaries && reportData.userSummaries.length > 0) {
+      reportData.userSummaries.forEach((u: any) => {
+        text += `👤 *${u.name.toUpperCase()}* — ${u.completionRate}% Done (Productivity: ${u.avgProductivity}%)\n`;
+        text += `Deliverables: ${u.totalTasks} Total (${u.completedTasks} Completed, ${u.inProgressTasks} In Progress)\n\n`;
+      });
+    }
+
+    text += `========================================\nGenerated via Daily Focus & Team Tracker`;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch (err) {
+      console.error('Failed to copy', err);
+    }
+  };
 
   // Export to CSV
   const handleExportCSV = () => {
@@ -123,9 +165,22 @@ export default function MonthlyReportModal({
     document.body.removeChild(link);
   };
 
-  // Print / PDF View
-  const handlePrint = () => {
-    window.print();
+  // Export to Customized Professional PDF
+  const handleExportPdf = () => {
+    if (!reportData || !reportData.tasks || reportData.tasks.length === 0) {
+      setStatusMessage({ type: 'error', text: 'No task records to export to PDF.' });
+      return;
+    }
+    const monthName = months.find((m) => m.value === selectedMonth)?.label || '';
+    const memberName =
+      selectedUserId === 'ALL'
+        ? 'All Members'
+        : users.find((u) => u.id === selectedUserId)?.name || 'Member';
+    try {
+      generateMonthlyReportPdf(reportData, monthName, selectedYear, memberName);
+    } catch (err: any) {
+      setStatusMessage({ type: 'error', text: err.message || 'Failed to export PDF' });
+    }
   };
 
   return (
@@ -197,8 +252,22 @@ export default function MonthlyReportModal({
             </select>
           </div>
 
-          {/* Export Action Buttons (CSV & Print/PDF) */}
+          {/* Export Action Buttons (Copy, CSV & Download PDF) */}
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleCopyClipboard}
+              disabled={isPending}
+              className={`px-3.5 py-1.5 rounded-xl text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-95 ${
+                copied
+                  ? 'bg-emerald-600'
+                  : 'bg-blue-600 hover:bg-blue-700'
+              }`}
+              title="Copy formatted text summary for WhatsApp / Slack / Email"
+            >
+              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copied ? 'Copied' : 'Copy for Manager'}</span>
+            </button>
+
             <button
               onClick={handleExportCSV}
               className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
@@ -209,12 +278,13 @@ export default function MonthlyReportModal({
             </button>
 
             <button
-              onClick={handlePrint}
+              onClick={handleExportPdf}
+              disabled={isPending}
               className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
-              title="Print or Save as PDF"
+              title="Download customized professional PDF Report"
             >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Print / PDF</span>
+              <Download className="w-3.5 h-3.5" />
+              <span>Download PDF</span>
             </button>
           </div>
         </div>

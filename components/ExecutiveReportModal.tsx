@@ -19,12 +19,17 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
+  Download,
 } from 'lucide-react';
 import {
   getMondayWorkplanReportData,
   getSaturdayProgressReportData,
 } from '@/lib/actions/task-actions';
 import { saveReport } from '@/lib/actions/report-actions';
+import {
+  generateMondayWorkplanPdf,
+  generateSaturdayProgressPdf,
+} from '@/lib/pdf-report-generator';
 
 interface ExecutiveReportModalProps {
   isOpen: boolean;
@@ -85,8 +90,16 @@ export default function ExecutiveReportModal({
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handleExportPdf = () => {
+    try {
+      if (activeTab === 'MONDAY') {
+        if (mondayData) generateMondayWorkplanPdf(mondayData);
+      } else {
+        if (saturdayData) generateSaturdayProgressPdf(saturdayData);
+      }
+    } catch (err) {
+      console.error('Failed to generate PDF', err);
+    }
   };
 
   // Export Saturday CSV
@@ -294,13 +307,13 @@ export default function ExecutiveReportModal({
             )}
 
             <button
-              onClick={handlePrint}
-              disabled={isPending}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
-              title="Export to PDF or Print"
+              onClick={handleExportPdf}
+              disabled={isPending || (activeTab === 'MONDAY' ? !mondayData : !saturdayData)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white transition-all shadow-xs active:scale-95 disabled:opacity-50"
+              title="Download customized professional PDF report"
             >
-              <Printer className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
-              <span className="hidden sm:inline">PDF / Print</span>
+              <Download className="w-3.5 h-3.5" />
+              <span>Download PDF</span>
             </button>
           </div>
         </div>

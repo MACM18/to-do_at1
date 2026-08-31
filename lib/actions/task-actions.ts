@@ -708,14 +708,14 @@ export async function getMondayWorkplanReportData() {
     year: 'numeric',
   });
 
-  let textSummary = `*TEAM WORKPLAN & DEVELOPER TASK REPORT*\nDate: ${dateStr}\n----------------------------------------\n\n`;
+  let textSummary = `*TEAM WORKPLAN & TASK REPORT*\nDate: ${dateStr}\n========================================\n\n`;
 
   developersWorkplan.forEach((dev) => {
-    textSummary += `👤 *${dev.name.toUpperCase()}* (${dev.role})\n`;
+    textSummary += `👤 *${dev.name.toUpperCase()}*\n`;
     textSummary += `Total Active Items: ${dev.totalActive}\n`;
 
     if (dev.ongoing.length > 0) {
-      textSummary += `▶ ONGOING / IN PROGRESS (${dev.ongoing.length}):\n`;
+      textSummary += `▶ IN PROGRESS (${dev.ongoing.length}):\n`;
       dev.ongoing.forEach((t) => {
         textSummary += `  • ${t.title} (${Number(t.progress || 0).toFixed(0)}% done)\n`;
       });
@@ -746,7 +746,7 @@ export async function getMondayWorkplanReportData() {
     textSummary += `\n`;
   });
 
-  textSummary += `----------------------------------------\nGenerated via Daily Focus Task Hub`;
+  textSummary += `========================================\nGenerated via Daily Focus & Team Tracker`;
 
   return {
     dateStr,
@@ -868,34 +868,37 @@ export async function getSaturdayProgressReportData(forcePeriod?: 'WEEKLY' | 'MO
   let textSummary = `*${isMonthly ? 'MONTHLY' : 'WEEKLY'} TEAM PROGRESS & COMPLETION REPORT*\nPeriod: ${periodTitle}\n`;
   textSummary += `Team Overall Completion: ${overallTeamCompletionRate}% | Productivity Score: ${overallTeamProductivity}%\n`;
   textSummary += `Total Deliverables: ${totalTasks} (${totalCompleted} Done, ${totalInProgress} In Progress, ${totalPending} Pending) + ${totalMeetings} Meetings\n`;
-  textSummary += `----------------------------------------\n\n`;
+  textSummary += `========================================\n\n`;
 
   developersBreakdown.forEach((dev) => {
-    textSummary += `👤 *${dev.name.toUpperCase()}* (${dev.role}) - ${dev.completionRate}% Done (Score: ${dev.productivityScore}%)\n`;
-    textSummary += `Completed: ${dev.completedTasks.length} | In Progress: ${dev.inProgressTasks.length} | Pending: ${dev.pendingTasks.length} | Meetings: ${dev.meetings.length}\n`;
+    textSummary += `👤 *${dev.name.toUpperCase()}* — ${dev.completionRate}% Done (Productivity: ${dev.productivityScore}%)\n`;
+    textSummary += `Deliverables: ${dev.totalTasks} Total (${dev.completedTasks.length} Done, ${dev.inProgressTasks.length} In Progress, ${dev.pendingTasks.length} Pending) | ${dev.meetings.length} Meetings\n`;
 
     if (dev.completedTasks.length > 0) {
-      textSummary += `  ✓ Completed Deliverables:\n`;
+      textSummary += `  ✓ Completed Deliverables (${dev.completedTasks.length}):\n`;
       dev.completedTasks.forEach((t) => {
-        textSummary += `    • ${t.title} (${t.startTime || '8.30'} - ${t.endTime || 'Done'})\n`;
+        textSummary += `    • ${t.title}\n`;
       });
     }
 
     if (dev.inProgressTasks.length > 0) {
-      textSummary += `  ▶ In-Progress Items:\n`;
+      textSummary += `  ▶ In-Progress Items (${dev.inProgressTasks.length}):\n`;
       dev.inProgressTasks.forEach((t) => {
-        textSummary += `    • ${t.title} (${Number(t.progress || 0).toFixed(0)}%)\n`;
+        textSummary += `    • ${t.title} (${Number(t.progress || 0).toFixed(0)}% done)\n`;
       });
     }
 
     if (dev.pendingTasks.length > 0) {
-      textSummary += `  ⏳ Pending Backlog (${dev.pendingTasks.length} items)\n`;
+      textSummary += `  ⏳ Pending Backlog (${dev.pendingTasks.length}):\n`;
+      dev.pendingTasks.forEach((t) => {
+        textSummary += `    • ${t.title}${t.dueDate ? ` (Due: ${new Date(t.dueDate).toLocaleDateString('en-US')})` : ''}\n`;
+      });
     }
 
     textSummary += `\n`;
   });
 
-  textSummary += `----------------------------------------\nGenerated via Daily Focus Task Hub`;
+  textSummary += `========================================\nGenerated via Daily Focus & Team Tracker`;
 
   return {
     isMonthly,
