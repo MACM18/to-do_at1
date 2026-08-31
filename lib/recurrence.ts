@@ -2,26 +2,25 @@ import { prisma } from './prisma';
 import { getDayBounds } from './time-utils';
 
 /**
- * Checks and resets recurring tasks (DAILY, WEEKLY) that were completed on previous days.
- * Resets task progress to 0, status to 'TODO', clears timing, unchecks subtasks, and updates lastResetDate.
+ * 1. Resets recurring tasks (DAILY, WEEKLY) that were completed on previous days:
+ *    - Status -> TODO, Progress -> 0, unchecks subtasks, clears timing, updates lastResetDate.
+ * 2. Resets the daily work timer (startTime and endTime) for in-progress or incomplete tasks carried over from previous days:
+ *    - Keeps status (e.g. IN_PROGRESS), keeps progress (e.g. 40%), keeps completed subtasks intact.
+ *    - Clears startTime -> null and endTime -> null so the timer starts fresh for today.
+ *    - Updates lastResetDate -> now.
  */
 export async function processRecurringTasks(userId?: string) {
   const { startOfDay: startOfToday } = getDayBounds(new Date(), 'Asia/Colombo');
   const now = new Date();
 
-  const whereClause: {
-    recurrence: { in: string[] };
-    userId?: string;
-  } = {
+  // 1. Process recurring completed tasks
+  const recurringWhere: any = {
     recurrence: { in: ['DAILY', 'WEEKLY'] },
   };
-
-  if (userId) {
-    whereClause.userId = userId;
-  }
+  if (userId) recurringWhere.userId = userId;
 
   const recurringTasks = await prisma.task.findMany({
-    where: whereClause,
+    where: recurringWhere,
     include: { subtasks: true },
   });
 
@@ -66,6 +65,40 @@ export async function processRecurringTasks(userId?: string) {
           },
         }),
       ]);
+      resetCount++;
+    }
+  }
+
+  // 2. Process in-progress or incomplete tasks carried over from yesterday (or earlier)
+  // For incomplete tasks with startTime or endTime from a previous date: reset timers for today!
+  const carriedOverWhere: any = {
+    status: { in: ['IN_PROGRESS', 'TODO'] },
+    OR: [
+      { startTime: { not: null } },
+      { endTime: { not: null } },
+    ],
+  };
+  if (userId) carriedOverWhere.userId = userId;
+
+  const carriedOverTasks = await prisma.task.findMany({
+    where: carriedOverWhere,
+  });
+
+  for (const task of carriedOverTasks) {
+    const lastReset = task.lastResetDate ? new Date(task.lastResetDate) : null;
+    const lastUpdate = new Date(task.updatedAt);
+    const createdDate = new Date(task.createdAt);
+
+    // If the task was started or updated before today's start in Asia/Colombo
+    if ((!lastReset || lastReset < startOfToday) && lastUpdate < startOfToday && createdDate < startOfToday) {
+      await prisma.task.update({
+        where: { id: task.id },
+        data: {
+          startTime: null,
+          endTime: null,
+          lastResetDate: now,
+        },
+      });
       resetCount++;
     }
   }

@@ -5,6 +5,7 @@ import { prisma } from '../prisma';
 import { processRecurringTasks } from '../recurrence';
 import {
   getLocalTimeDot,
+  formatTo24HrDot,
   getDayBounds,
   getWeekBounds,
   getMonthBounds,
@@ -271,14 +272,15 @@ export async function startTask(taskId: string) {
   if (!task) return null;
 
   const updateData: any = {};
-  if (!task.startTime) {
-    if (task.recurrence === 'DAILY') {
-      const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
-      updateData.startTime = config?.shiftStartTime || '8.30';
-    } else {
-      updateData.startTime = getCurrentDotTime();
-    }
+  const currentTime = getLocalTimeDot(new Date(), 'Asia/Colombo');
+
+  if (task.recurrence === 'DAILY') {
+    const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
+    updateData.startTime = formatTo24HrDot(config?.shiftStartTime || '08.30');
+  } else {
+    updateData.startTime = currentTime;
   }
+  updateData.endTime = null;
 
   if (task.status === 'TODO') {
     updateData.status = 'IN_PROGRESS';
@@ -321,7 +323,7 @@ export async function toggleTaskComplete(taskId: string, currentStatus: string) 
 
   if (nextDone) {
     if (!task.startTime) {
-      taskUpdateData.startTime = task.recurrence === 'DAILY' ? '8.30' : currentTime;
+      taskUpdateData.startTime = task.recurrence === 'DAILY' ? '08.30' : currentTime;
     }
     taskUpdateData.endTime = currentTime;
   }
@@ -376,7 +378,7 @@ export async function toggleSubtask(subtaskId: string, taskId: string) {
 
   // If subtask started/toggled and parent task has no startTime, set it
   if (parentTask && !parentTask.startTime) {
-    taskUpdateData.startTime = parentTask.recurrence === 'DAILY' ? '8.30' : currentTime;
+    taskUpdateData.startTime = parentTask.recurrence === 'DAILY' ? '08.30' : currentTime;
   }
 
   // If task reaches 100% completion, record endTime
