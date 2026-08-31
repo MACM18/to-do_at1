@@ -9,7 +9,7 @@ import {
   SlidersHorizontal,
   ChevronUp,
   X,
-  Sparkles,
+  PlusCircle,
   Tag,
   Calendar,
 } from 'lucide-react';
@@ -82,7 +82,7 @@ export default function CompactTaskCreator({
         {/* Main Single Row Input */}
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 shrink-0">
-            <Sparkles className="w-4 h-4" />
+            <PlusCircle className="w-4 h-4" />
           </div>
 
           <input

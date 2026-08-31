@@ -14,13 +14,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Daily Task & Team Tracker',
+  title: 'To-Do MACM',
   description: 'Mobile-first PWA for daily work focus, team task monitoring, and automated Gmail reports.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Daily Focus',
+    title: 'To-Do MACM',
   },
   formatDetection: {
     telephone: false,

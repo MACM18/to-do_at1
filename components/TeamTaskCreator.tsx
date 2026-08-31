@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
-import { Plus, Calendar, Sparkles, FileText, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Plus, Calendar, PlusCircle, FileText, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { createTask } from '@/lib/actions/task-actions';
 
 interface TeamTaskCreatorProps {
@@ -50,7 +50,7 @@ export default function TeamTaskCreator({
         {/* Main Single Row Input */}
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 shrink-0">
-            <Sparkles className="w-4 h-4" />
+            <PlusCircle className="w-4 h-4" />
           </div>
 
           <input

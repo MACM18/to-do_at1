@@ -52,7 +52,7 @@ export default function LoginPage() {
             <CheckSquare className="w-7 h-7" />
           </div>
           <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">
-            Daily Focus & Team Tracker
+            To-Do MACM
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             Sign in to access your personal task hub and work logs

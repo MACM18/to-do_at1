@@ -69,7 +69,7 @@ function addPdfFooter(doc: jsPDF) {
     doc.setFontSize(8);
     doc.setTextColor(148, 163, 184); // Slate-400
     doc.setFont('helvetica', 'normal');
-    doc.text('Daily Focus & Team Tracker • Confidential Report', 14, pageHeight - 7);
+    doc.text('To-Do MACM • Confidential Report', 14, pageHeight - 7);
     doc.text(`Page ${i} of ${totalPages}`, pageWidth - 14, pageHeight - 7, { align: 'right' });
   }
 }
