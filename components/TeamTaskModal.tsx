@@ -28,12 +28,11 @@ export default function TeamTaskModal({
   userName,
   editingTask,
 }: TeamTaskModalProps) {
-  const todayStr = new Date().toISOString().split('T')[0];
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('TODO');
   const [progress, setProgress] = useState(0);
-  const [dueDate, setDueDate] = useState(todayStr);
+  const [dueDate, setDueDate] = useState('');
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -45,16 +44,16 @@ export default function TeamTaskModal({
       setDueDate(
         editingTask.dueDate
           ? new Date(editingTask.dueDate).toISOString().split('T')[0]
-          : todayStr
+          : ''
       );
     } else {
       setTitle('');
       setDescription('');
       setStatus('TODO');
       setProgress(0);
-      setDueDate(todayStr);
+      setDueDate('');
     }
-  }, [editingTask, isOpen, todayStr]);
+  }, [editingTask, isOpen]);
 
   if (!isOpen) return null;
 
@@ -83,9 +82,9 @@ export default function TeamTaskModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !dueDate) return;
+    if (!title.trim()) return;
 
-    const resolvedDate = new Date(dueDate);
+    const resolvedDate = dueDate ? new Date(dueDate) : null;
 
     startTransition(async () => {
       if (editingTask) {
@@ -102,7 +101,7 @@ export default function TeamTaskModal({
           description: description.trim() || undefined,
           status,
           progress,
-          dueDate: resolvedDate,
+          dueDate: resolvedDate || undefined,
           userId,
           priority: 'High',
           assignedBy: 'Myself',
@@ -174,15 +173,14 @@ export default function TeamTaskModal({
             />
           </div>
 
-          {/* Task Date (Compulsory) */}
+          {/* Target Due Date (Optional) */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Task Date <span className="text-rose-500">*</span> (Compulsory)
+              Target Due Date (Optional)
             </label>
             <div className="relative">
               <input
                 type="date"
-                required
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"

@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { useState, useTransition } from 'react';
+import React, { useState, useTransition } from "react";
 import {
   Settings,
   Mail,
@@ -23,18 +23,18 @@ import {
   Lock,
   KeyRound,
   ShieldAlert,
-} from 'lucide-react';
-import UserModal from './UserModal';
-import ConfirmDialog from './ConfirmDialog';
+} from "lucide-react";
+import UserModal from "./UserModal";
+import ConfirmDialog from "./ConfirmDialog";
 import {
   updateConfig,
   testSmtpConnectionAction,
   sendTestEmailAction,
   triggerMorningReportAction,
   triggerEveningSummaryAction,
-} from '@/lib/actions/config-actions';
-import { deleteUser, updateUserPassword } from '@/lib/actions/user-actions';
-import { formatTo24HrDot } from '@/lib/time-utils';
+} from "@/lib/actions/config-actions";
+import { deleteUser, updateUserPassword } from "@/lib/actions/user-actions";
+import { formatTo24HrDot } from "@/lib/time-utils";
 
 interface SettingsTabProps {
   config: any;
@@ -51,64 +51,76 @@ export default function SettingsTab({
   const [users, setUsers] = useState<any[]>(initialUsers);
   const [isPending, startTransition] = useTransition();
   const [statusMessage, setStatusMessage] = useState<{
-    type: 'success' | 'error';
+    type: "success" | "error";
     text: string;
   } | null>(null);
 
   // Form State
-  const [smtpHost, setSmtpHost] = useState(initialConfig?.smtpHost || 'smtp.gmail.com');
+  const [smtpHost, setSmtpHost] = useState(
+    initialConfig?.smtpHost || "smtp.gmail.com",
+  );
   const [smtpPort, setSmtpPort] = useState(initialConfig?.smtpPort || 465);
-  const [smtpSecure, setSmtpSecure] = useState(initialConfig?.smtpSecure ?? true);
-  const [smtpUser, setSmtpUser] = useState(initialConfig?.smtpUser || '');
-  const [hasSavedPassword, setHasSavedPassword] = useState(Boolean(initialConfig?.smtpPassword));
-  const [isEditingPassword, setIsEditingPassword] = useState(!initialConfig?.smtpPassword);
-  const [smtpPassword, setSmtpPassword] = useState('');
+  const [smtpSecure, setSmtpSecure] = useState(
+    initialConfig?.smtpSecure ?? true,
+  );
+  const [smtpUser, setSmtpUser] = useState(initialConfig?.smtpUser || "");
+  const [hasSavedPassword, setHasSavedPassword] = useState(
+    Boolean(initialConfig?.smtpPassword),
+  );
+  const [isEditingPassword, setIsEditingPassword] = useState(
+    !initialConfig?.smtpPassword,
+  );
+  const [smtpPassword, setSmtpPassword] = useState("");
   const [senderName, setSenderName] = useState(
-    initialConfig?.senderName || 'Daily Focus & Team Tracker'
+    initialConfig?.senderName || "Daily Focus & Team Tracker",
   );
   const [toRecipients, setToRecipients] = useState(
-    initialConfig?.toRecipients || initialConfig?.emailRecipients || ''
+    initialConfig?.toRecipients || initialConfig?.emailRecipients || "",
   );
-  const [ccRecipients, setCcRecipients] = useState(initialConfig?.ccRecipients || '');
-  const [bccRecipients, setBccRecipients] = useState(initialConfig?.bccRecipients || '');
+  const [ccRecipients, setCcRecipients] = useState(
+    initialConfig?.ccRecipients || "",
+  );
+  const [bccRecipients, setBccRecipients] = useState(
+    initialConfig?.bccRecipients || "",
+  );
 
   // Automation & Shift State (24-hour format)
   const [morningReportTime, setMorningReportTime] = useState(
-    initialConfig?.morningReportTime || '08:00'
+    initialConfig?.morningReportTime || "08:00",
   );
   const [eveningReportTime, setEveningReportTime] = useState(
-    initialConfig?.eveningReportTime || '17:30'
+    initialConfig?.eveningReportTime || "17:30",
   );
   const [shiftStartTime, setShiftStartTime] = useState(
-    formatTo24HrDot(initialConfig?.shiftStartTime || '08.30')
+    formatTo24HrDot(initialConfig?.shiftStartTime || "08.30"),
   );
   const [prepEndTime, setPrepEndTime] = useState(
-    formatTo24HrDot(initialConfig?.prepEndTime || '08.45')
+    formatTo24HrDot(initialConfig?.prepEndTime || "08.45"),
   );
   const [shiftEndTime, setShiftEndTime] = useState(
-    formatTo24HrDot(initialConfig?.shiftEndTime || '17.30')
+    formatTo24HrDot(initialConfig?.shiftEndTime || "17.30"),
   );
   const [autoSendDailyLog, setAutoSendDailyLog] = useState(
-    Boolean(initialConfig?.autoSendDailyLog)
+    Boolean(initialConfig?.autoSendDailyLog),
   );
 
   const [showPassword, setShowPassword] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [testEmailAddress, setTestEmailAddress] = useState('');
+  const [testEmailAddress, setTestEmailAddress] = useState("");
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
   // Password Management State
   const [selectedPasswordUserId, setSelectedPasswordUserId] = useState<string>(
-    users[0]?.id || ''
+    users[0]?.id || "",
   );
-  const [newTargetPassword, setNewTargetPassword] = useState('');
-  const [confirmTargetPassword, setConfirmTargetPassword] = useState('');
+  const [newTargetPassword, setNewTargetPassword] = useState("");
+  const [confirmTargetPassword, setConfirmTargetPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [isPasswordConfirmOpen, setIsPasswordConfirmOpen] = useState(false);
 
-  const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'LEAD';
+  const isAdmin = currentUser?.role === "ADMIN" || currentUser?.role === "LEAD";
 
   // Save Config
   const handleSaveConfig = (e: React.FormEvent) => {
@@ -144,16 +156,16 @@ export default function SettingsTab({
         if (updated.smtpPassword) {
           setHasSavedPassword(true);
           setIsEditingPassword(false);
-          setSmtpPassword('');
+          setSmtpPassword("");
         }
         setStatusMessage({
-          type: 'success',
-          text: 'Settings, shift timings, and To/CC/BCC recipients saved successfully.',
+          type: "success",
+          text: "Settings, shift timings, and To/CC/BCC recipients saved successfully.",
         });
       } catch (err: any) {
         setStatusMessage({
-          type: 'error',
-          text: err.message || 'Failed to save settings',
+          type: "error",
+          text: err.message || "Failed to save settings",
         });
       }
     });
@@ -168,12 +180,15 @@ export default function SettingsTab({
         smtpPort: Number(smtpPort),
         smtpSecure,
         smtpUser,
-        smtpPassword: isEditingPassword && smtpPassword.trim() ? smtpPassword.trim() : undefined,
+        smtpPassword:
+          isEditingPassword && smtpPassword.trim()
+            ? smtpPassword.trim()
+            : undefined,
       });
       if (res.success) {
-        setStatusMessage({ type: 'success', text: res.message });
+        setStatusMessage({ type: "success", text: res.message });
       } else {
-        setStatusMessage({ type: 'error', text: res.message });
+        setStatusMessage({ type: "error", text: res.message });
       }
     });
   };
@@ -182,20 +197,21 @@ export default function SettingsTab({
   const handleSendTestEmail = () => {
     if (!testEmailAddress.trim() && !toRecipients.trim()) {
       setStatusMessage({
-        type: 'error',
-        text: 'Please enter a test recipient email address.',
+        type: "error",
+        text: "Please enter a test recipient email address.",
       });
       return;
     }
 
     setStatusMessage(null);
     startTransition(async () => {
-      const target = testEmailAddress.trim() || toRecipients.split(',')[0].trim();
+      const target =
+        testEmailAddress.trim() || toRecipients.split(",")[0].trim();
       const res = await sendTestEmailAction(target);
       if (res.success) {
-        setStatusMessage({ type: 'success', text: res.message });
+        setStatusMessage({ type: "success", text: res.message });
       } else {
-        setStatusMessage({ type: 'error', text: res.message });
+        setStatusMessage({ type: "error", text: res.message });
       }
     });
   };
@@ -206,9 +222,9 @@ export default function SettingsTab({
     startTransition(async () => {
       const res = await triggerMorningReportAction(currentUser.id);
       if (res.success) {
-        setStatusMessage({ type: 'success', text: res.message });
+        setStatusMessage({ type: "success", text: res.message });
       } else {
-        setStatusMessage({ type: 'error', text: res.message });
+        setStatusMessage({ type: "error", text: res.message });
       }
     });
   };
@@ -219,9 +235,9 @@ export default function SettingsTab({
     startTransition(async () => {
       const res = await triggerEveningSummaryAction(undefined, currentUser.id);
       if (res.success) {
-        setStatusMessage({ type: 'success', text: res.message });
+        setStatusMessage({ type: "success", text: res.message });
       } else {
-        setStatusMessage({ type: 'error', text: res.message });
+        setStatusMessage({ type: "error", text: res.message });
       }
     });
   };
@@ -233,10 +249,10 @@ export default function SettingsTab({
       try {
         await deleteUser(userToDelete);
         setUserToDelete(null);
-        setStatusMessage({ type: 'success', text: 'Team member removed.' });
+        setStatusMessage({ type: "success", text: "Team member removed." });
       } catch (err: any) {
         setUserToDelete(null);
-        setStatusMessage({ type: 'error', text: err.message });
+        setStatusMessage({ type: "error", text: err.message });
       }
     });
   };
@@ -245,15 +261,21 @@ export default function SettingsTab({
   const handleRequestPasswordChange = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPasswordUserId) {
-      setStatusMessage({ type: 'error', text: 'Please select a team member.' });
+      setStatusMessage({ type: "error", text: "Please select a team member." });
       return;
     }
     if (!newTargetPassword || newTargetPassword.length < 4) {
-      setStatusMessage({ type: 'error', text: 'Password must be at least 4 characters.' });
+      setStatusMessage({
+        type: "error",
+        text: "Password must be at least 4 characters.",
+      });
       return;
     }
     if (newTargetPassword !== confirmTargetPassword) {
-      setStatusMessage({ type: 'error', text: 'Passwords do not match. Please re-type.' });
+      setStatusMessage({
+        type: "error",
+        text: "Passwords do not match. Please re-type.",
+      });
       return;
     }
 
@@ -264,14 +286,17 @@ export default function SettingsTab({
   const handleExecutePasswordChange = () => {
     startTransition(async () => {
       try {
-        const res = await updateUserPassword(selectedPasswordUserId, newTargetPassword);
+        const res = await updateUserPassword(
+          selectedPasswordUserId,
+          newTargetPassword,
+        );
         setIsPasswordConfirmOpen(false);
-        setNewTargetPassword('');
-        setConfirmTargetPassword('');
-        setStatusMessage({ type: 'success', text: res.message });
+        setNewTargetPassword("");
+        setConfirmTargetPassword("");
+        setStatusMessage({ type: "success", text: res.message });
       } catch (err: any) {
         setIsPasswordConfirmOpen(false);
-        setStatusMessage({ type: 'error', text: err.message });
+        setStatusMessage({ type: "error", text: err.message });
       }
     });
   };
@@ -284,13 +309,13 @@ export default function SettingsTab({
       {statusMessage && (
         <div
           className={`p-3.5 rounded-2xl text-xs font-semibold flex items-center justify-between gap-2.5 animate-in fade-in duration-150 ${
-            statusMessage.type === 'success'
-              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/50'
-              : 'bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/50'
+            statusMessage.type === "success"
+              ? "bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/50"
+              : "bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/50"
           }`}
         >
           <div className="flex items-center gap-2">
-            {statusMessage.type === 'success' ? (
+            {statusMessage.type === "success" ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             ) : (
               <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
@@ -324,7 +349,9 @@ export default function SettingsTab({
                   <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                     Gmail & SMTP Email Settings
                   </h2>
-                  <p className="text-xs text-slate-500">Configure email credentials, To, CC, and BCC lists</p>
+                  <p className="text-xs text-slate-500">
+                    Configure email credentials, To, CC, and BCC lists
+                  </p>
                 </div>
               </div>
 
@@ -341,12 +368,37 @@ export default function SettingsTab({
             {showHelp && (
               <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 text-xs text-blue-900 dark:text-blue-200 space-y-2">
                 <h4 className="font-bold flex items-center gap-1.5">
-                  <Shield className="w-4 h-4 text-blue-600" /> How to get a Gmail App Password:
+                  <Shield className="w-4 h-4 text-blue-600" /> How to get a
+                  Gmail App Password:
                 </h4>
                 <ol className="list-decimal list-inside space-y-1 text-slate-700 dark:text-slate-300">
-                  <li>Open Google Account: <a href="https://myaccount.google.com/security" target="_blank" rel="noreferrer" className="text-blue-600 font-bold underline">Security Settings</a>.</li>
-                  <li>Ensure <strong>2-Step Verification</strong> is enabled.</li>
-                  <li>Go to <strong>App Passwords</strong> (<a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" className="text-blue-600 font-bold underline">myaccount.google.com/apppasswords</a>).</li>
+                  <li>
+                    Open Google Account:{" "}
+                    <a
+                      href="https://myaccount.google.com/security"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-600 font-bold underline"
+                    >
+                      Security Settings
+                    </a>
+                    .
+                  </li>
+                  <li>
+                    Ensure <strong>2-Step Verification</strong> is enabled.
+                  </li>
+                  <li>
+                    Go to <strong>App Passwords</strong> (
+                    <a
+                      href="https://myaccount.google.com/apppasswords"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-600 font-bold underline"
+                    >
+                      myaccount.google.com/apppasswords
+                    </a>
+                    ).
+                  </li>
                   <li>Generate a 16-character password and paste below.</li>
                 </ol>
               </div>
@@ -421,15 +473,12 @@ export default function SettingsTab({
                           <Lock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                           <span>•••• •••• •••• ••••</span>
                         </div>
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                          Encrypted in DB
-                        </span>
                       </div>
                       <button
                         type="button"
                         onClick={() => {
                           setIsEditingPassword(true);
-                          setSmtpPassword('');
+                          setSmtpPassword("");
                         }}
                         className="px-3 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all shrink-0 hover:scale-102 active:scale-95 flex items-center gap-1.5"
                         title="Change App Password"
@@ -450,7 +499,7 @@ export default function SettingsTab({
                           type="button"
                           onClick={() => {
                             setIsEditingPassword(false);
-                            setSmtpPassword('');
+                            setSmtpPassword("");
                           }}
                           className="text-[11px] font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 underline"
                         >
@@ -460,7 +509,7 @@ export default function SettingsTab({
                     </div>
                     <div className="relative">
                       <input
-                        type={showPassword ? 'text' : 'password'}
+                        type={showPassword ? "text" : "password"}
                         required={!hasSavedPassword}
                         value={smtpPassword}
                         onChange={(e) => setSmtpPassword(e.target.value)}
@@ -472,7 +521,11 @@ export default function SettingsTab({
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                       >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        {showPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
                       </button>
                     </div>
                   </div>
@@ -503,7 +556,10 @@ export default function SettingsTab({
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                     Recipient Lists (To, CC, BCC)
                   </h3>
-                  <p className="text-[11px] text-slate-400">Comma-separated email addresses for automated and manual dispatches</p>
+                  <p className="text-[11px] text-slate-400">
+                    Comma-separated email addresses for automated and manual
+                    dispatches
+                  </p>
                 </div>
               </div>
 
@@ -511,7 +567,10 @@ export default function SettingsTab({
                 {/* To */}
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    To Recipients * <span className="text-slate-400 font-normal">(Primary direct recipients)</span>
+                    To Recipients *{" "}
+                    <span className="text-slate-400 font-normal">
+                      (Primary direct recipients)
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -526,7 +585,10 @@ export default function SettingsTab({
                 {/* CC */}
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    CC Recipients <span className="text-slate-400 font-normal">(Carbon copy - visible to all)</span>
+                    CC Recipients{" "}
+                    <span className="text-slate-400 font-normal">
+                      (Carbon copy - visible to all)
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -540,7 +602,10 @@ export default function SettingsTab({
                 {/* BCC */}
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    BCC Recipients <span className="text-slate-400 font-normal">(Blind carbon copy - hidden archive/backup)</span>
+                    BCC Recipients{" "}
+                    <span className="text-slate-400 font-normal">
+                      (Blind carbon copy - hidden archive/backup)
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -564,7 +629,9 @@ export default function SettingsTab({
                     Automated Task Log Dispatch
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    Morning Day Plan is <strong>Manual Only</strong>. Automated dispatch runs for evening Task Logs on working days (+05:30).
+                    Morning Day Plan is <strong>Manual Only</strong>. Automated
+                    dispatch runs for evening Task Logs on working days
+                    (+05:30).
                   </p>
                 </div>
               </div>
@@ -661,7 +728,11 @@ export default function SettingsTab({
                 disabled={isPending}
                 className="px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 active:scale-95 flex items-center gap-2"
               >
-                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                {isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
                 Save Settings & Timings
               </button>
             </div>
@@ -678,7 +749,9 @@ export default function SettingsTab({
                   <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                     Team & Employee Management
                   </h2>
-                  <p className="text-xs text-slate-500">Manage user accounts, roles and status</p>
+                  <p className="text-xs text-slate-500">
+                    Manage user accounts, roles and status
+                  </p>
                 </div>
               </div>
 
@@ -706,12 +779,14 @@ export default function SettingsTab({
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 dark:text-slate-100">{u.name}</span>
+                        <span className="font-bold text-slate-900 dark:text-slate-100">
+                          {u.name}
+                        </span>
                         <span
                           className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                            u.role === 'ADMIN' || u.role === 'LEAD'
-                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                              : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300'
+                            u.role === "ADMIN" || u.role === "LEAD"
+                              ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                              : "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300"
                           }`}
                         >
                           {u.role}
@@ -765,12 +840,16 @@ export default function SettingsTab({
                     Team Member Password Management
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Administrator tool to update and reset passwords for team members
+                    Administrator tool to update and reset passwords for team
+                    members
                   </p>
                 </div>
               </div>
 
-              <form onSubmit={handleRequestPasswordChange} className="space-y-4 pt-1">
+              <form
+                onSubmit={handleRequestPasswordChange}
+                className="space-y-4 pt-1"
+              >
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -778,7 +857,9 @@ export default function SettingsTab({
                     </label>
                     <select
                       value={selectedPasswordUserId}
-                      onChange={(e) => setSelectedPasswordUserId(e.target.value)}
+                      onChange={(e) =>
+                        setSelectedPasswordUserId(e.target.value)
+                      }
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
                     >
                       {users.map((u) => (
@@ -795,7 +876,7 @@ export default function SettingsTab({
                     </label>
                     <div className="relative">
                       <input
-                        type={showNewPassword ? 'text' : 'password'}
+                        type={showNewPassword ? "text" : "password"}
                         required
                         value={newTargetPassword}
                         onChange={(e) => setNewTargetPassword(e.target.value)}
@@ -807,7 +888,11 @@ export default function SettingsTab({
                         onClick={() => setShowNewPassword(!showNewPassword)}
                         className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                       >
-                        {showNewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        {showNewPassword ? (
+                          <EyeOff className="w-3.5 h-3.5" />
+                        ) : (
+                          <Eye className="w-3.5 h-3.5" />
+                        )}
                       </button>
                     </div>
                   </div>
@@ -817,7 +902,7 @@ export default function SettingsTab({
                       Confirm Password *
                     </label>
                     <input
-                      type={showNewPassword ? 'text' : 'password'}
+                      type={showNewPassword ? "text" : "password"}
                       required
                       value={confirmTargetPassword}
                       onChange={(e) => setConfirmTargetPassword(e.target.value)}
@@ -830,7 +915,9 @@ export default function SettingsTab({
                 <div className="flex justify-end pt-1">
                   <button
                     type="submit"
-                    disabled={isPending || !newTargetPassword || !confirmTargetPassword}
+                    disabled={
+                      isPending || !newTargetPassword || !confirmTargetPassword
+                    }
                     className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-bold transition-all shadow-sm active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
                   >
                     <Lock className="w-3.5 h-3.5" />
@@ -863,7 +950,11 @@ export default function SettingsTab({
                 disabled={isPending || !smtpUser || !smtpPassword}
                 className="w-full py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 text-amber-500" />}
+                {isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Zap className="w-4 h-4 text-amber-500" />
+                )}
                 Test SMTP Connection
               </button>
 
@@ -947,7 +1038,7 @@ export default function SettingsTab({
         isOpen={isPasswordConfirmOpen}
         title="Confirm Password Change"
         message={`Are you sure you want to update the login password for ${
-          targetPasswordUser?.name || 'this team member'
+          targetPasswordUser?.name || "this team member"
         }? They will immediately need to use this new password to sign in.`}
         confirmText="Update Password"
         isLoading={isPending}

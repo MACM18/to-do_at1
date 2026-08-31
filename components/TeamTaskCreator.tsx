@@ -15,10 +15,9 @@ export default function TeamTaskCreator({
   userName,
   onCreated,
 }: TeamTaskCreatorProps) {
-  const todayStr = new Date().toISOString().split('T')[0];
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [dueDate, setDueDate] = useState(todayStr);
+  const [dueDate, setDueDate] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -26,13 +25,11 @@ export default function TeamTaskCreator({
     e.preventDefault();
     if (!title.trim()) return;
 
-    const resolvedDate = dueDate ? new Date(dueDate) : new Date();
-
     startTransition(async () => {
       await createTask({
         title: title.trim(),
         description: description.trim() || undefined,
-        dueDate: resolvedDate,
+        dueDate: dueDate ? new Date(dueDate) : undefined,
         userId,
         priority: 'High',
         assignedBy: 'Myself',
@@ -41,7 +38,7 @@ export default function TeamTaskCreator({
 
       setTitle('');
       setDescription('');
-      setDueDate(todayStr);
+      setDueDate('');
       setIsExpanded(false);
       if (onCreated) onCreated();
     });
@@ -65,15 +62,14 @@ export default function TeamTaskCreator({
             className="flex-1 px-2 py-1.5 text-xs sm:text-sm bg-transparent text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
           />
 
-          {/* Compulsory Date Input */}
+          {/* Optional Due Date Input */}
           <div className="relative flex items-center">
             <input
               type="date"
-              required
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
               className="px-2 py-1 text-[11px] font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              title="Task Date (Compulsory)"
+              title="Target Due Date (Optional)"
             />
           </div>
 
