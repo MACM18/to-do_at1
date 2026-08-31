@@ -20,6 +20,7 @@ import {
 import TeamTaskCard from './TeamTaskCard';
 import TeamTaskModal from './TeamTaskModal';
 import TeamTaskCreator from './TeamTaskCreator';
+import UserModal from './UserModal';
 import MonthlyReportModal from './MonthlyReportModal';
 import ExecutiveReportModal from './ExecutiveReportModal';
 import { getDayBounds, getReportTimeSlots } from '@/lib/time-utils';
@@ -49,6 +50,7 @@ export default function TeamViewTab({
     defaultSelectedUser?.id || 'ALL'
   );
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [isMonthlyModalOpen, setIsMonthlyModalOpen] = useState(false);
   const [isExecutiveModalOpen, setIsExecutiveModalOpen] = useState(false);
   const [executiveReportType, setExecutiveReportType] = useState<'MONDAY' | 'SATURDAY' | 'MONTHLY'>('MONDAY');
@@ -394,9 +396,20 @@ export default function TeamViewTab({
 
           {/* Team Member Selector List Widget */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-              Team Members ({activeUsers.length})
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                Team Members ({activeUsers.length})
+              </h4>
+              <button
+                type="button"
+                onClick={() => setIsAddMemberModalOpen(true)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-600 dark:text-indigo-400 text-xs font-bold transition-all shadow-2xs hover:scale-105 active:scale-95 border border-indigo-200/60 dark:border-indigo-800"
+                title="Add New Member"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span className="text-[11px]">Add Member</span>
+              </button>
+            </div>
 
             <div className="space-y-2">
               {/* Prioritize other members, with current user at end */}
@@ -456,6 +469,12 @@ export default function TeamViewTab({
           </div>
         </div>
       </div>
+
+      {/* Quick Add Member Modal */}
+      <UserModal
+        isOpen={isAddMemberModalOpen}
+        onClose={() => setIsAddMemberModalOpen(false)}
+      />
 
       {/* Team Task Creation & Edit Modal */}
       <TeamTaskModal

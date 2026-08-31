@@ -416,6 +416,12 @@ export async function testSmtpConnection(customConfig?: any) {
     let transporter: nodemailer.Transporter;
 
     if (customConfig && customConfig.smtpHost) {
+      let pass = customConfig.smtpPassword;
+      if (!pass || !pass.trim()) {
+        const saved = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
+        pass = saved?.smtpPassword || '';
+      }
+
       const port = Number(customConfig.smtpPort) || 465;
       const isSecure = customConfig.smtpSecure ?? (port === 465);
       transporter = nodemailer.createTransport({
@@ -424,7 +430,7 @@ export async function testSmtpConnection(customConfig?: any) {
         secure: isSecure,
         auth: {
           user: customConfig.smtpUser?.trim(),
-          pass: customConfig.smtpPassword?.replace(/\s+/g, ''),
+          pass: pass.replace(/\s+/g, ''),
         },
         connectionTimeout: 8000,
       });
