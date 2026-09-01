@@ -16,7 +16,6 @@ import MyTasksTab from './MyTasksTab';
 import TeamViewTab from './TeamViewTab';
 import ReportsTab from './ReportsTab';
 import SettingsTab from './SettingsTab';
-import UserSwitcher from './UserSwitcher';
 import { logoutAction } from '@/lib/actions/auth-actions';
 import { useRouter } from 'next/navigation';
 
@@ -41,20 +40,14 @@ export default function AppShell({
 }: AppShellProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'MY_TASKS' | 'TEAM_VIEW' | 'REPORTS' | 'SETTINGS'>('MY_TASKS');
-  const [currentUserId, setCurrentUserId] = useState<string>(sessionUser?.id || initialUsers[0]?.id || '');
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isLoggingOut, startLogoutTransition] = useTransition();
 
-  const currentUser =
-    initialUsers.find((u) => u.id === currentUserId) || sessionUser || initialUsers[0] || {
-      id: 'default',
-      name: 'Chathura',
-      email: 'chathura@example.com',
-      role: 'LEAD',
-    };
-
-  const handleUserChange = (newUserId: string) => {
-    setCurrentUserId(newUserId);
+  const currentUser = sessionUser || initialUsers[0] || {
+    id: 'default',
+    name: 'Chathura',
+    email: 'chathura@example.com',
+    role: 'LEAD',
   };
 
   const handleRefresh = () => {
@@ -90,10 +83,7 @@ export default function AppShell({
           {/* Desktop Navigation Links */}
           <div className="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-2xl border border-slate-200/60 dark:border-slate-700/60">
             <button
-              onClick={() => {
-                setCurrentUserId(sessionUser.id);
-                setActiveTab('MY_TASKS');
-              }}
+              onClick={() => setActiveTab('MY_TASKS')}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all ${
                 activeTab === 'MY_TASKS'
                   ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
@@ -150,17 +140,6 @@ export default function AppShell({
             >
               <RefreshCw className="w-4 h-4" />
             </button>
-
-            {/* In Team View / Reports / Settings: user switcher if lead */}
-            {activeTab !== 'MY_TASKS' && initialUsers.length > 0 && (
-              <div className="hidden sm:block">
-                <UserSwitcher
-                  users={initialUsers}
-                  currentUser={currentUser}
-                  onUserChange={handleUserChange}
-                />
-              </div>
-            )}
 
             {/* Touch-Friendly User Profile Circle Avatar & Popover Menu */}
             <div className="relative">
@@ -290,10 +269,7 @@ export default function AppShell({
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-200/80 dark:border-slate-800 safe-bottom shadow-lg">
         <div className="max-w-md mx-auto px-6 h-16 flex items-center justify-around">
           <button
-            onClick={() => {
-              setCurrentUserId(sessionUser.id);
-              setActiveTab('MY_TASKS');
-            }}
+            onClick={() => setActiveTab('MY_TASKS')}
             className={`flex flex-col items-center justify-center gap-1 transition-all py-1 px-4 rounded-2xl ${
               activeTab === 'MY_TASKS'
                 ? 'text-blue-600 dark:text-blue-400 font-bold scale-105'
