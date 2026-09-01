@@ -10,6 +10,8 @@ import {
   getWeekBounds,
   getMonthBounds,
   isLastSaturdayOfMonth,
+  formatLocalDate,
+  getLocalDateParts,
 } from '../time-utils';
 
 /**
@@ -628,7 +630,7 @@ export async function getMonthlyReportData(options: {
       inProgressTasks,
       pendingTasks: totalTasks - completedTasks - inProgressTasks,
       averageProductivity,
-      monthName: startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      monthName: formatLocalDate(startDate, { month: 'long', year: 'numeric' }),
     },
   };
 }
@@ -639,7 +641,7 @@ export async function getMonthlyReportData(options: {
  * with formatted text ready to copy to clipboard for managers + structured PDF data.
  */
 export async function getMondayWorkplanReportData() {
-  const { startOfDay: todayStart } = getDayBounds(new Date());
+  const { startOfDay: todayStart, formattedShort: dateStr } = getDayBounds(new Date());
 
   const activeUsers = await prisma.user.findMany({
     where: { isActive: true },
@@ -701,13 +703,6 @@ export async function getMondayWorkplanReportData() {
   });
 
   // Build Creative Text Summary for Manager Clipboard Sharing
-  const dateStr = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-
   let textSummary = `*TEAM WORKPLAN & TASK REPORT*\nDate: ${dateStr}\n========================================\n\n`;
 
   developersWorkplan.forEach((dev) => {
@@ -817,24 +812,17 @@ export async function getSaturdayProgressReportData(forcePeriod?: 'WEEKLY' | 'MO
   let periodTitle: string;
 
   if (isMonthly) {
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Colombo',
-      year: 'numeric',
-      month: 'numeric',
-    });
-    const parts = formatter.formatToParts(now);
-    const year = parseInt(parts.find((p) => p.type === 'year')?.value || '2026', 10);
-    const month = parseInt(parts.find((p) => p.type === 'month')?.value || '1', 10);
+    const { year, month } = getLocalDateParts(now);
 
     const monthBounds = getMonthBounds(year, month);
     startDate = monthBounds.startOfMonth;
     endDate = monthBounds.endOfMonth;
-    periodTitle = `Monthly Team Deliverables (${startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })})`;
+    periodTitle = `Monthly Team Deliverables (${formatLocalDate(startDate, { month: 'long', year: 'numeric' })})`;
   } else {
     const weekBounds = getWeekBounds(now);
     startDate = weekBounds.startOfWeek;
     endDate = weekBounds.endOfWeek;
-    periodTitle = `Weekly Team Progress (${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})`;
+    periodTitle = `Weekly Team Progress (${formatLocalDate(startDate, { month: 'short', day: 'numeric' })} - ${formatLocalDate(endDate, { month: 'short', day: 'numeric', year: 'numeric' })})`;
   }
 
   const activeUsers = await prisma.user.findMany({

@@ -19,6 +19,8 @@ import {
   Check,
   Loader2,
   Sparkles,
+  Link2,
+  Hash,
 } from 'lucide-react';
 import {
   getEmailDraftPreview,
@@ -50,6 +52,11 @@ export default function EmailPreviewModal({
   const [loading, setLoading] = useState(true);
   const [subject, setSubject] = useState('');
   const [threadSubject, setThreadSubject] = useState('');
+  const [monthKey, setMonthKey] = useState('');
+  const [rootMessageId, setRootMessageId] = useState<string | null>(null);
+  const [lastMessageId, setLastMessageId] = useState<string | null>(null);
+  const [isThreadActive, setIsThreadActive] = useState(false);
+
   const [toRecipients, setToRecipients] = useState('');
   const [ccRecipients, setCcRecipients] = useState('');
   const [bccRecipients, setBccRecipients] = useState('');
@@ -80,6 +87,11 @@ export default function EmailPreviewModal({
 
       setSubject(data.subject || '');
       setThreadSubject(data.threadSubject || '');
+      setMonthKey(data.monthKey || '');
+      setRootMessageId(data.rootMessageId || null);
+      setLastMessageId(data.lastMessageId || null);
+      setIsThreadActive(data.isThreadActive || false);
+
       setToRecipients(data.toRecipients || '');
       setCcRecipients(data.ccRecipients || '');
       setBccRecipients(data.bccRecipients || '');
@@ -285,6 +297,45 @@ export default function EmailPreviewModal({
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
             {/* Email Metadata Controls Card */}
             <div className="bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3.5">
+              {/* Thread & Conversation ID Info Banner (Non-editable) */}
+              <div className="p-3 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="p-2 rounded-xl bg-blue-600 text-white shrink-0 shadow-sm">
+                    <Link2 className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-blue-950 dark:text-blue-200">
+                        Monthly Thread (Conversation ID):
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full font-mono text-[10px] font-bold bg-blue-200/70 dark:bg-blue-900/70 text-blue-900 dark:text-blue-200">
+                        {monthKey || 'Current Month'}
+                      </span>
+                      {isThreadActive ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Active Reply Thread
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                          Initial Month Email
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-blue-800/90 dark:text-blue-300/90 font-mono truncate mt-0.5">
+                      {rootMessageId ? (
+                        <span>ID: {rootMessageId}</span>
+                      ) : (
+                        <span>Will initialize new monthly email thread upon dispatch</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 bg-white/80 dark:bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0 font-medium">
+                  {isThreadActive ? 'Replies are chained in recipient inboxes' : 'Creates clean monthly thread'}
+                </div>
+              </div>
+
               {/* Subject Line */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1 uppercase tracking-wider">

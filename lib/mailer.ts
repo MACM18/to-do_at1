@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 import { prisma } from './prisma';
-import { getDayBounds, getLocalTimeDot, formatTo24HrDot } from './time-utils';
+import { getDayBounds, getLocalTimeDot, formatTo24HrDot, getLocalDateParts } from './time-utils';
 
 /**
  * Normalizes recipient list string for accurate comparison
@@ -91,11 +91,7 @@ export async function getMonthlyThreadDetails(
   targetDate: Date = new Date(),
   currentToRecipients: string = ''
 ) {
-  const year = targetDate.getFullYear();
-  const month = String(targetDate.getMonth() + 1).padStart(2, '0');
-  const monthKey = `${year}-${month}`; // e.g. "2026-08"
-
-  const monthName = targetDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const { monthKey, monthName } = getLocalDateParts(targetDate);
   const user = await prisma.user.findUnique({ where: { id: userId } });
   const userName = user?.name || 'Lead';
 
@@ -203,15 +199,8 @@ export function buildReportTableHtml(options: {
   const isMorning = mode === 'morning';
   const planTitle = isMorning ? 'Day Plan' : 'Task Log';
 
-  const dateHeader = targetDate.toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-
-  const targetDay = targetDate.getDay(); // 0 is Sunday, 6 is Saturday
-  const isSaturday = targetDay === 6;
+  const { formattedLong: dateHeader, dayOfWeek } = getLocalDateParts(targetDate);
+  const isSaturday = dayOfWeek === 6;
   const defaultShiftEnd = isSaturday ? '13.30' : config?.shiftEndTime ? formatTo24HrDot(config.shiftEndTime) : '17.30';
 
   const shiftStart = formatTo24HrDot(customShift?.shiftStartTime || config?.shiftStartTime || '08.30');

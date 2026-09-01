@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { formatLocalDate, getLocalDateParts } from './time-utils';
 
 // Extend jsPDF interface for autoTable plugin
 interface jsPDFWithAutoTable extends jsPDF {
@@ -38,7 +39,7 @@ function addPdfHeader(
   // Generation timestamp & period on right
   doc.setFontSize(8);
   doc.setTextColor(226, 232, 240);
-  const nowStr = new Date().toLocaleDateString('en-US', {
+  const nowStr = formatLocalDate(new Date(), {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -83,12 +84,14 @@ export function generateMondayWorkplanPdf(mondayData: any) {
   }
 
   const doc = new jsPDF('p', 'mm', 'a4') as jsPDFWithAutoTable;
-  const dateStr = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const dateStr =
+    mondayData.dateStr ||
+    formatLocalDate(new Date(), {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
 
   addPdfHeader(
     doc,
@@ -243,7 +246,7 @@ export function generateMondayWorkplanPdf(mondayData: any) {
   });
 
   addPdfFooter(doc);
-  const fileName = `monday_workplan_${new Date().toISOString().split('T')[0]}.pdf`;
+  const fileName = `monday_workplan_${getLocalDateParts(new Date()).dateStr}.pdf`;
   doc.save(fileName);
 }
 
@@ -462,54 +465,57 @@ export function generateMonthlyReportPdf(
   selectedYear: number,
   memberFilterName: string = 'All Members'
 ) {
-  if (!reportData || !reportData.tasks || reportData.tasks.length === 0) {
-    throw new Error('No task data available to generate monthly report PDF.');
+  if (!reportData || !reportData.tasks) {
+    throw new Error('No monthly report data available to generate PDF.');
   }
 
   const doc = new jsPDF('p', 'mm', 'a4') as jsPDFWithAutoTable;
-  const periodTitle = `${selectedMonthName} ${selectedYear} (${memberFilterName})`;
+  const periodText = `${selectedMonthName} ${selectedYear} (${memberFilterName})`;
 
   addPdfHeader(
     doc,
     'MONTHLY CONSOLIDATED TASK REPORT',
     'Comprehensive Deliverable Breakdown & Monthly Productivity Log',
-    periodTitle
+    periodText
   );
 
   let currentY = 35;
 
-  // KPI Overview
+  // Key Summary Card Table
   if (reportData.summary) {
+    const s = reportData.summary;
     autoTable(doc, {
       startY: currentY,
       head: [
         [
-          'Total Monthly Tasks',
+          'Total Deliverables',
           'Completed Tasks',
-          'In Progress',
+          'In Progress Tasks',
+          'Pending Backlog',
           'Completion Rate',
           'Avg Productivity',
         ],
       ],
       body: [
         [
-          `${reportData.summary.totalTasks} Items`,
-          `${reportData.summary.completedTasks} Done`,
-          `${reportData.summary.inProgressTasks} In Prog`,
-          `${reportData.summary.completionRate}%`,
-          `${reportData.summary.avgProductivity}%`,
+          `${s.totalTasks} Tasks`,
+          `${s.completedTasks} Done`,
+          `${s.inProgressTasks} In Prog`,
+          `${s.pendingTasks} Backlog`,
+          `${reportData.summary.completionRate || ((s.totalTasks > 0 ? (s.completedTasks / s.totalTasks) * 100 : 0).toFixed(1))}%`,
+          `${s.averageProductivity || '0.00'}%`,
         ],
       ],
       theme: 'grid',
       headStyles: {
-        fillColor: [37, 99, 235], // Blue-600
+        fillColor: [59, 130, 246], // Blue-500
         textColor: 255,
         fontStyle: 'bold',
-        fontSize: 8.5,
+        fontSize: 8,
         halign: 'center',
       },
       bodyStyles: {
-        fontSize: 8.5,
+        fontSize: 8,
         fontStyle: 'bold',
         textColor: [30, 41, 59],
         cellPadding: 3,
@@ -521,24 +527,24 @@ export function generateMonthlyReportPdf(
     currentY = (doc.lastAutoTable?.finalY || currentY) + 8;
   }
 
-  // Developer Summaries
+  // Developer Summary Breakdown (if multiple users)
   if (reportData.userSummaries && reportData.userSummaries.length > 0) {
     const userSummaryRows = reportData.userSummaries.map((u: any) => [
       u.name,
       u.totalTasks,
       u.completedTasks,
       u.inProgressTasks,
-      `${u.completionRate}%`,
-      `${u.avgProductivity}%`,
+      `${u.completionRate || 0}%`,
+      `${u.avgProductivity || '0.00'}%`,
     ]);
 
     autoTable(doc, {
       startY: currentY,
-      head: [['Team Member', 'Total Tasks', 'Completed', 'In Progress', 'Completion Rate', 'Productivity']],
+      head: [['Member Name', 'Total Tasks', 'Completed', 'In Progress', 'Completion Rate', 'Avg Productivity']],
       body: userSummaryRows,
       theme: 'striped',
       headStyles: {
-        fillColor: [51, 65, 85],
+        fillColor: [71, 85, 105], // Slate-600
         textColor: 255,
         fontStyle: 'bold',
         fontSize: 8,
@@ -564,7 +570,7 @@ export function generateMonthlyReportPdf(
 
   // Full Task Listing Table
   const taskRows = reportData.tasks.map((t: any) => [
-    new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    formatLocalDate(t.date, { month: 'short', day: 'numeric' }),
     t.userName,
     t.title,
     t.status === 'DONE' ? 'DONE' : 'IN PROGRESS',

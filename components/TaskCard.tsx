@@ -29,6 +29,7 @@ import {
 } from '@/lib/actions/task-actions';
 import ConfirmDialog from './ConfirmDialog';
 import confetti from 'canvas-confetti';
+import { getDayBounds, formatLocalDate } from '@/lib/time-utils';
 
 interface Subtask {
   id: string;
@@ -75,16 +76,12 @@ interface TaskCardProps {
 function renderDueDateBadge(dueDate: Date | string | null | undefined, isDone: boolean) {
   if (!dueDate) return null;
 
-  const due = new Date(dueDate);
-  const now = new Date();
-
-  // Midnight normalized for exact days
-  const dueMidnight = new Date(due.getFullYear(), due.getMonth(), due.getDate());
-  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const { startOfDay: dueMidnight } = getDayBounds(new Date(dueDate));
+  const { startOfDay: nowMidnight } = getDayBounds(new Date());
 
   const diffTime = dueMidnight.getTime() - nowMidnight.getTime();
   const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-  const monthDay = due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const monthDay = formatLocalDate(dueDate, { month: 'short', day: 'numeric' });
 
   if (isDone) {
     return (

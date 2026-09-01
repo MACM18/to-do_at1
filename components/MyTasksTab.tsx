@@ -84,7 +84,7 @@ export default function MyTasksTab({
     }
   };
 
-  const todayDay = new Date().getDay(); // 0: Sunday, 6: Saturday
+  const { startOfDay: todayStart, dayOfWeek: todayDay } = getDayBounds(new Date());
   const defaultShiftEnd = todayDay === 6 ? '13.30' : config?.shiftEndTime ? formatTo24HrDot(config.shiftEndTime) : '17.30';
 
   // Daily custom check-in & check-out state
@@ -110,8 +110,6 @@ export default function MyTasksTab({
 
   // Filter tasks strictly for current user
   const userTasks = tasks.filter((t) => t.userId === currentUser.id);
-
-  const { startOfDay: todayStart } = getDayBounds(new Date());
 
   // Ongoing tasks: Started (has startTime) or in progress, not done
   const ongoingTasks = userTasks.filter(

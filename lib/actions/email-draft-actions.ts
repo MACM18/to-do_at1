@@ -45,7 +45,7 @@ export async function getEmailDraftPreview(params: {
 
   const { userId, type, date, customCheckInTime, customCheckOutTime } = params;
   const targetDate = date ? new Date(date) : new Date();
-  const { startOfDay: todayStart, endOfDay: todayEnd } = getDayBounds(targetDate);
+  const { startOfDay: todayStart, endOfDay: todayEnd, dayOfWeek } = getDayBounds(targetDate);
 
   const targetUser = await prisma.user.findUnique({
     where: { id: userId },
@@ -61,7 +61,7 @@ export async function getEmailDraftPreview(params: {
 
   const { toList, ccList, bccList } = resolveRecipients(config);
 
-  const isSaturday = todayStart.getDay() === 6;
+  const isSaturday = dayOfWeek === 6;
   const defaultShiftStart = formatTo24HrDot(config?.shiftStartTime || '08.30');
   const defaultShiftEnd = isSaturday ? '13.30' : formatTo24HrDot(config?.shiftEndTime || '17.30');
 
@@ -78,6 +78,13 @@ export async function getEmailDraftPreview(params: {
     orderBy: { createdAt: 'desc' },
   });
 
+  // Get monthly thread metadata for conversation ID
+  const { monthKey, baseSubject, existingThread } = await getMonthlyThreadDetails(
+    targetUser.id,
+    todayStart,
+    toList.join(', ')
+  );
+
   if (savedDraft) {
     return {
       id: savedDraft.id,
@@ -87,7 +94,11 @@ export async function getEmailDraftPreview(params: {
       type: savedDraft.type,
       date: savedDraft.date.toISOString(),
       subject: savedDraft.subject,
-      threadSubject: savedDraft.threadSubject,
+      threadSubject: savedDraft.threadSubject || existingThread?.subject || baseSubject,
+      monthKey,
+      rootMessageId: existingThread?.rootMessageId || null,
+      lastMessageId: existingThread?.lastMessageId || null,
+      isThreadActive: Boolean(existingThread && existingThread.rootMessageId),
       toRecipients: savedDraft.toRecipients,
       ccRecipients: savedDraft.ccRecipients || '',
       bccRecipients: savedDraft.bccRecipients || '',
@@ -153,12 +164,6 @@ export async function getEmailDraftPreview(params: {
     orderBy: { startTime: 'asc' },
   });
 
-  const { monthKey, baseSubject, existingThread } = await getMonthlyThreadDetails(
-    targetUser.id,
-    todayStart,
-    toList.join(', ')
-  );
-
   const resolvedSubject = existingThread ? `Re: ${existingThread.subject}` : baseSubject;
 
   const generatedHtml = buildReportTableHtml({
@@ -184,6 +189,10 @@ export async function getEmailDraftPreview(params: {
     date: todayStart.toISOString(),
     subject: resolvedSubject,
     threadSubject: existingThread?.subject || baseSubject,
+    monthKey,
+    rootMessageId: existingThread?.rootMessageId || null,
+    lastMessageId: existingThread?.lastMessageId || null,
+    isThreadActive: Boolean(existingThread && existingThread.rootMessageId),
     toRecipients: toList.join(', '),
     ccRecipients: ccList.join(', '),
     bccRecipients: bccList.join(', '),
@@ -333,8 +342,8 @@ export async function sendEmailDraftNow(data: {
     }
 
     const targetDate = data.date ? new Date(data.date) : new Date();
-    const { startOfDay: todayStart, endOfDay: todayEnd } = getDayBounds(targetDate);
-    const isSaturday = todayStart.getDay() === 6;
+    const { startOfDay: todayStart, endOfDay: todayEnd, dayOfWeek } = getDayBounds(targetDate);
+    const isSaturday = dayOfWeek === 6;
 
     const toList = data.toRecipients
       .split(',')

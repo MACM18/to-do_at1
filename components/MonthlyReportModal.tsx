@@ -18,6 +18,7 @@ import {
 import { getMonthlyReportData } from '@/lib/actions/task-actions';
 import { autoSaveGeneratedReport } from '@/lib/actions/report-actions';
 import { generateMonthlyReportPdf } from '@/lib/pdf-report-generator';
+import { getLocalDateParts } from '@/lib/time-utils';
 
 interface MonthlyReportModalProps {
   isOpen: boolean;
@@ -32,9 +33,9 @@ export default function MonthlyReportModal({
   users,
   initialUserId = 'ALL',
 }: MonthlyReportModalProps) {
-  const currentDate = new Date();
-  const [selectedYear, setSelectedYear] = useState<number>(currentDate.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState<number>(currentDate.getMonth() + 1);
+  const { year: currentYear, month: currentMonth } = getLocalDateParts(new Date());
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [selectedMonth, setSelectedMonth] = useState<number>(currentMonth);
   const [selectedUserId, setSelectedUserId] = useState<string>(initialUserId);
   const [reportData, setReportData] = useState<any>(null);
   const [copied, setCopied] = useState(false);
@@ -56,7 +57,7 @@ export default function MonthlyReportModal({
     { value: 12, label: 'December' },
   ];
 
-  const years = [currentDate.getFullYear() - 1, currentDate.getFullYear(), currentDate.getFullYear() + 1];
+  const years = [currentYear - 1, currentYear, currentYear + 1];
 
   const loadData = () => {
     startTransition(async () => {
