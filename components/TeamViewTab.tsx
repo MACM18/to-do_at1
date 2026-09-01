@@ -72,10 +72,12 @@ export default function TeamViewTab({
   // Selected member's tasks
   const memberTasks = selectedUser ? tasks.filter((t) => t.userId === selectedUser.id) : [];
   const memberCarryOver = memberTasks.filter(
-    (t) => new Date(t.createdAt) < todayStart && t.status !== 'DONE'
+    (t) => new Date(t.createdAt) < todayStart && t.recurrence === 'NONE' && t.status !== 'DONE'
   );
   const memberActive = memberTasks.filter(
-    (t) => new Date(t.createdAt) >= todayStart && t.status !== 'DONE'
+    (t) =>
+      (new Date(t.createdAt) >= todayStart || t.recurrence === 'DAILY' || t.recurrence === 'WEEKLY') &&
+      t.status !== 'DONE'
   );
   const memberCompleted = memberTasks.filter(
     (t) =>

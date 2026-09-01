@@ -675,13 +675,14 @@ export async function getMondayWorkplanReportData() {
     const carryOver = u.tasks.filter(
       (t) =>
         new Date(t.createdAt) < todayStart &&
+        t.recurrence === 'NONE' &&
         t.status !== 'DONE' &&
         !t.startTime &&
         t.status !== 'IN_PROGRESS'
     );
     const activeToday = u.tasks.filter(
       (t) =>
-        new Date(t.createdAt) >= todayStart &&
+        (new Date(t.createdAt) >= todayStart || t.recurrence === 'DAILY' || t.recurrence === 'WEEKLY') &&
         t.status !== 'DONE' &&
         !t.startTime &&
         t.status !== 'IN_PROGRESS'

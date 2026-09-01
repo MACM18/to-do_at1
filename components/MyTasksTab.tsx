@@ -116,19 +116,20 @@ export default function MyTasksTab({
     (t) => t.status !== 'DONE' && (Boolean(t.startTime) || t.status === 'IN_PROGRESS')
   );
 
-  // Carry-over backlog: Not started yet, created before today
+  // Carry-over backlog: Not started yet, created before today, and NOT recurring
   const carryOverTasks = userTasks.filter(
     (t) =>
       new Date(t.createdAt) < todayStart &&
+      t.recurrence === 'NONE' &&
       t.status !== 'DONE' &&
       !t.startTime &&
       t.status !== 'IN_PROGRESS'
   );
 
-  // Scheduled for today: Not started yet, created today
+  // Scheduled for today: Created today OR recurring (Daily/Weekly) resetting for today
   const activeTodayTasks = userTasks.filter(
     (t) =>
-      new Date(t.createdAt) >= todayStart &&
+      (new Date(t.createdAt) >= todayStart || t.recurrence === 'DAILY' || t.recurrence === 'WEEKLY') &&
       t.status !== 'DONE' &&
       !t.startTime &&
       t.status !== 'IN_PROGRESS'
