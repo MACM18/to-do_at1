@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useState, useEffect, useTransition } from "react";
 import {
   Sun,
   Moon,
@@ -22,17 +22,24 @@ import {
   Users,
   Play,
   Eye,
-} from 'lucide-react';
-import TaskCard from './TaskCard';
-import TaskModal from './TaskModal';
-import DailyLogModal from './DailyLogModal';
-import MeetingModal from './MeetingModal';
-import CompactTaskCreator from './CompactTaskCreator';
-import EmailPreviewModal from './EmailPreviewModal';
-import { triggerMorningReportAction, triggerEveningSummaryAction } from '@/lib/actions/config-actions';
-import { saveTodayShift, getTodayShift } from '@/lib/actions/shift-actions';
-import { getTodayEmailDraftStatus } from '@/lib/actions/email-draft-actions';
-import { getDayBounds, getLocalTimeDot, formatTo24HrDot } from '@/lib/time-utils';
+} from "lucide-react";
+import TaskCard from "./TaskCard";
+import TaskModal from "./TaskModal";
+import DailyLogModal from "./DailyLogModal";
+import MeetingModal from "./MeetingModal";
+import CompactTaskCreator from "./CompactTaskCreator";
+import EmailPreviewModal from "./EmailPreviewModal";
+import {
+  triggerMorningReportAction,
+  triggerEveningSummaryAction,
+} from "@/lib/actions/config-actions";
+import { saveTodayShift, getTodayShift } from "@/lib/actions/shift-actions";
+import { getTodayEmailDraftStatus } from "@/lib/actions/email-draft-actions";
+import {
+  getDayBounds,
+  getLocalTimeDot,
+  formatTo24HrDot,
+} from "@/lib/time-utils";
 
 interface MyTasksTabProps {
   currentUser: any;
@@ -51,20 +58,27 @@ export default function MyTasksTab({
   config,
   initialMeetings = [],
 }: MyTasksTabProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACTIVE' | 'DONE'>('ALL');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"ALL" | "ACTIVE" | "DONE">(
+    "ALL",
+  );
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState<any>(null);
   const [isCompletedExpanded, setIsCompletedExpanded] = useState(true);
-  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   // Email Preview Studio state
   const [isEmailPreviewOpen, setIsEmailPreviewOpen] = useState(false);
-  const [emailPreviewType, setEmailPreviewType] = useState<'MORNING_PLAN' | 'EVENING_TASKLOG'>('MORNING_PLAN');
+  const [emailPreviewType, setEmailPreviewType] = useState<
+    "MORNING_PLAN" | "EVENING_TASKLOG"
+  >("MORNING_PLAN");
   const [draftStatuses, setDraftStatuses] = useState<{
     morning: { hasDraft: boolean; isSent: boolean; sentAt: string | null };
     evening: { hasDraft: boolean; isSent: boolean; sentAt: string | null };
@@ -79,16 +93,25 @@ export default function MyTasksTab({
         const statuses = await getTodayEmailDraftStatus(currentUser.id);
         setDraftStatuses(statuses);
       } catch (err) {
-        console.error('Failed to load email draft statuses', err);
+        console.error("Failed to load email draft statuses", err);
       }
     }
   };
 
-  const { startOfDay: todayStart, dayOfWeek: todayDay } = getDayBounds(new Date());
-  const defaultShiftEnd = todayDay === 6 ? '13.30' : config?.shiftEndTime ? formatTo24HrDot(config.shiftEndTime) : '17.30';
+  const { startOfDay: todayStart, dayOfWeek: todayDay } = getDayBounds(
+    new Date(),
+  );
+  const defaultShiftEnd =
+    todayDay === 6
+      ? "13.30"
+      : config?.shiftEndTime
+        ? formatTo24HrDot(config.shiftEndTime)
+        : "17.30";
 
   // Daily custom check-in & check-out state
-  const [checkInTime, setCheckInTime] = useState(formatTo24HrDot(config?.shiftStartTime || '08.30'));
+  const [checkInTime, setCheckInTime] = useState(
+    formatTo24HrDot(config?.shiftStartTime || "08.30"),
+  );
   const [checkOutTime, setCheckOutTime] = useState(defaultShiftEnd);
   const [isShiftSaved, setIsShiftSaved] = useState(false);
 
@@ -97,10 +120,12 @@ export default function MyTasksTab({
       if (currentUser?.id) {
         const shift = await getTodayShift(currentUser.id);
         if (shift) {
-          if (shift.shiftStartTime) setCheckInTime(formatTo24HrDot(shift.shiftStartTime));
-          if (shift.shiftEndTime) setCheckOutTime(formatTo24HrDot(shift.shiftEndTime));
+          if (shift.shiftStartTime)
+            setCheckInTime(formatTo24HrDot(shift.shiftStartTime));
+          if (shift.shiftEndTime)
+            setCheckOutTime(formatTo24HrDot(shift.shiftEndTime));
         } else if (todayDay === 6) {
-          setCheckOutTime('13.30');
+          setCheckOutTime("13.30");
         }
         loadDraftStatus();
       }
@@ -113,36 +138,40 @@ export default function MyTasksTab({
 
   // Ongoing tasks: Started (has startTime) or in progress, not done
   const ongoingTasks = userTasks.filter(
-    (t) => t.status !== 'DONE' && (Boolean(t.startTime) || t.status === 'IN_PROGRESS')
+    (t) =>
+      t.status !== "DONE" &&
+      (Boolean(t.startTime) || t.status === "IN_PROGRESS"),
   );
 
   // Carry-over backlog: Not started yet, created before today, and NOT recurring
   const carryOverTasks = userTasks.filter(
     (t) =>
       new Date(t.createdAt) < todayStart &&
-      t.recurrence === 'NONE' &&
-      t.status !== 'DONE' &&
+      t.recurrence === "NONE" &&
+      t.status !== "DONE" &&
       !t.startTime &&
-      t.status !== 'IN_PROGRESS'
+      t.status !== "IN_PROGRESS",
   );
 
   // Scheduled for today: Created today OR recurring (Daily/Weekly) resetting for today
   const activeTodayTasks = userTasks.filter(
     (t) =>
-      (new Date(t.createdAt) >= todayStart || t.recurrence === 'DAILY' || t.recurrence === 'WEEKLY') &&
-      t.status !== 'DONE' &&
+      (new Date(t.createdAt) >= todayStart ||
+        t.recurrence === "DAILY" ||
+        t.recurrence === "WEEKLY") &&
+      t.status !== "DONE" &&
       !t.startTime &&
-      t.status !== 'IN_PROGRESS'
+      t.status !== "IN_PROGRESS",
   );
 
   // Today's completed tasks (including recurring tasks completed today)
   const completedTasks = userTasks.filter(
     (t) =>
-      t.status === 'DONE' &&
+      t.status === "DONE" &&
       (new Date(t.updatedAt) >= todayStart ||
         new Date(t.createdAt) >= todayStart ||
-        t.recurrence === 'DAILY' ||
-        t.recurrence === 'WEEKLY')
+        t.recurrence === "DAILY" ||
+        t.recurrence === "WEEKLY"),
   );
 
   // Filter logic
@@ -150,7 +179,8 @@ export default function MyTasksTab({
     return list.filter((t) => {
       const matchesSearch =
         t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase()));
+        (t.description &&
+          t.description.toLowerCase().includes(searchQuery.toLowerCase()));
       return matchesSearch;
     });
   };
@@ -162,8 +192,12 @@ export default function MyTasksTab({
 
   const totalCount = userTasks.length;
   const completedCount = completedTasks.length;
-  const totalProgressSum = userTasks.reduce((sum, t) => sum + (t.progress || 0), 0);
-  const averageProductivity = totalCount > 0 ? (totalProgressSum / totalCount).toFixed(2) : '0.00';
+  const totalProgressSum = userTasks.reduce(
+    (sum, t) => sum + (t.progress || 0),
+    0,
+  );
+  const averageProductivity =
+    totalCount > 0 ? (totalProgressSum / totalCount).toFixed(2) : "0.00";
 
   // Save Today's Shift Times
   const handleSaveShiftTimes = () => {
@@ -188,11 +222,15 @@ export default function MyTasksTab({
         shiftEndTime: checkOutTime,
       });
 
-      const res = await triggerMorningReportAction(currentUser.id, undefined, checkInTime);
+      const res = await triggerMorningReportAction(
+        currentUser.id,
+        undefined,
+        checkInTime,
+      );
       if (res.success) {
-        setStatusMessage({ type: 'success', text: res.message });
+        setStatusMessage({ type: "success", text: res.message });
       } else {
-        setStatusMessage({ type: 'error', text: res.message });
+        setStatusMessage({ type: "error", text: res.message });
       }
       setTimeout(() => setStatusMessage(null), 6000);
     });
@@ -208,11 +246,15 @@ export default function MyTasksTab({
         shiftEndTime: checkOutTime,
       });
 
-      const res = await triggerEveningSummaryAction(undefined, currentUser.id, checkOutTime);
+      const res = await triggerEveningSummaryAction(
+        undefined,
+        currentUser.id,
+        checkOutTime,
+      );
       if (res.success) {
-        setStatusMessage({ type: 'success', text: res.message });
+        setStatusMessage({ type: "success", text: res.message });
       } else {
-        setStatusMessage({ type: 'error', text: res.message });
+        setStatusMessage({ type: "error", text: res.message });
       }
       setTimeout(() => setStatusMessage(null), 6000);
     });
@@ -220,7 +262,7 @@ export default function MyTasksTab({
 
   // User's today logs
   const todayLogs = logs.filter(
-    (l) => l.userId === currentUser.id && new Date(l.date) >= todayStart
+    (l) => l.userId === currentUser.id && new Date(l.date) >= todayStart,
   );
 
   return (
@@ -229,13 +271,13 @@ export default function MyTasksTab({
       {statusMessage && (
         <div
           className={`p-3.5 rounded-2xl text-xs font-semibold flex items-center justify-between gap-2.5 animate-in fade-in duration-150 ${
-            statusMessage.type === 'success'
-              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/50'
-              : 'bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/50'
+            statusMessage.type === "success"
+              ? "bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/50"
+              : "bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/50"
           }`}
         >
           <div className="flex items-center gap-2">
-            {statusMessage.type === 'success' ? (
+            {statusMessage.type === "success" ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             ) : (
               <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
@@ -274,89 +316,97 @@ export default function MyTasksTab({
             </div>
 
             <div className="flex bg-slate-200/60 dark:bg-slate-800 p-1 rounded-xl shrink-0">
-              {(['ALL', 'ACTIVE', 'DONE'] as const).map((status) => (
+              {(["ALL", "ACTIVE", "DONE"] as const).map((status) => (
                 <button
                   key={status}
                   onClick={() => setFilterStatus(status)}
                   className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
                     filterStatus === status
-                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
                   }`}
                 >
-                  {status === 'ALL' ? 'All' : status === 'ACTIVE' ? 'Active' : 'Done'}
+                  {status === "ALL"
+                    ? "All"
+                    : status === "ACTIVE"
+                      ? "Active"
+                      : "Done"}
                 </button>
               ))}
             </div>
           </div>
 
           {/* Section 0: Highlighted Ongoing Tasks */}
-          {(filterStatus === 'ALL' || filterStatus === 'ACTIVE') && filteredOngoing.length > 0 && (
-            <div className="space-y-3 p-4 rounded-3xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/90 dark:border-blue-900/60 shadow-xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600"></span>
+          {(filterStatus === "ALL" || filterStatus === "ACTIVE") &&
+            filteredOngoing.length > 0 && (
+              <div className="space-y-3 p-4 rounded-3xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/90 dark:border-blue-900/60 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600"></span>
+                    </span>
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300">
+                      Ongoing Tasks ({filteredOngoing.length})
+                    </h2>
+                  </div>
+                  <span className="text-[11px] font-medium text-blue-600 dark:text-blue-400">
+                    Currently In Progress
                   </span>
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300">
-                    Ongoing Tasks ({filteredOngoing.length})
-                  </h2>
                 </div>
-                <span className="text-[11px] font-medium text-blue-600 dark:text-blue-400">
-                  Currently In Progress
-                </span>
-              </div>
 
-              <div className="space-y-2.5">
-                {filteredOngoing.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    isCarryOver={false}
-                    onEdit={(t) => {
-                      setEditingTask(t);
-                      setIsTaskModalOpen(true);
-                    }}
-                  />
-                ))}
+                <div className="space-y-2.5">
+                  {filteredOngoing.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      isCarryOver={false}
+                      onEdit={(t) => {
+                        setEditingTask(t);
+                        setIsTaskModalOpen(true);
+                      }}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Section 1: Carry-Over Backlogs */}
-          {(filterStatus === 'ALL' || filterStatus === 'ACTIVE') && filteredCarryOver.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="p-1 rounded-lg bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400">
-                    <AlertCircle className="w-3.5 h-3.5" />
+          {(filterStatus === "ALL" || filterStatus === "ACTIVE") &&
+            filteredCarryOver.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1 rounded-lg bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                    </span>
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400">
+                      Pending Backlog ({filteredCarryOver.length})
+                    </h2>
+                  </div>
+                  <span className="text-[11px] text-slate-400">
+                    Carry-over from past days
                   </span>
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400">
-                    Pending Backlog ({filteredCarryOver.length})
-                  </h2>
                 </div>
-                <span className="text-[11px] text-slate-400">Carry-over from past days</span>
-              </div>
 
-              <div className="space-y-2.5">
-                {filteredCarryOver.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    isCarryOver={true}
-                    onEdit={(t) => {
-                      setEditingTask(t);
-                      setIsTaskModalOpen(true);
-                    }}
-                  />
-                ))}
+                <div className="space-y-2.5">
+                  {filteredCarryOver.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      isCarryOver={true}
+                      onEdit={(t) => {
+                        setEditingTask(t);
+                        setIsTaskModalOpen(true);
+                      }}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Section 2: Today's Active Tasks */}
-          {(filterStatus === 'ALL' || filterStatus === 'ACTIVE') && (
+          {(filterStatus === "ALL" || filterStatus === "ACTIVE") && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -367,7 +417,9 @@ export default function MyTasksTab({
                     Today&apos;s Active Tasks ({filteredActiveToday.length})
                   </h2>
                 </div>
-                <span className="text-[11px] text-slate-400">Scheduled for today</span>
+                <span className="text-[11px] text-slate-400">
+                  Scheduled for today
+                </span>
               </div>
 
               {filteredActiveToday.length > 0 ? (
@@ -393,40 +445,43 @@ export default function MyTasksTab({
           )}
 
           {/* Section 3: Compacted Completed Tasks at the Bottom */}
-          {(filterStatus === 'ALL' || filterStatus === 'DONE') && filteredCompleted.length > 0 && (
-            <div className="pt-3 border-t border-slate-200/80 dark:border-slate-800 space-y-2">
-              <button
-                onClick={() => setIsCompletedExpanded(!isCompletedExpanded)}
-                className="flex items-center justify-between w-full py-1 text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-              >
-                <div className="flex items-center gap-1.5">
-                  <CheckCheck className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Today&apos;s Completed Tasks ({filteredCompleted.length})</span>
-                </div>
-                {isCompletedExpanded ? (
-                  <ChevronUp className="w-3.5 h-3.5" />
-                ) : (
-                  <ChevronDown className="w-3.5 h-3.5" />
-                )}
-              </button>
+          {(filterStatus === "ALL" || filterStatus === "DONE") &&
+            filteredCompleted.length > 0 && (
+              <div className="pt-3 border-t border-slate-200/80 dark:border-slate-800 space-y-2">
+                <button
+                  onClick={() => setIsCompletedExpanded(!isCompletedExpanded)}
+                  className="flex items-center justify-between w-full py-1 text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <CheckCheck className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>
+                      Today&apos;s Completed Tasks ({filteredCompleted.length})
+                    </span>
+                  </div>
+                  {isCompletedExpanded ? (
+                    <ChevronUp className="w-3.5 h-3.5" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  )}
+                </button>
 
-              {isCompletedExpanded && (
-                <div className="space-y-1.5 animate-in fade-in duration-150">
-                  {filteredCompleted.map((task) => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      isCompactDone={true}
-                      onEdit={(t) => {
-                        setEditingTask(t);
-                        setIsTaskModalOpen(true);
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+                {isCompletedExpanded && (
+                  <div className="space-y-1.5 animate-in fade-in duration-150">
+                    {filteredCompleted.map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        isCompactDone={true}
+                        onEdit={(t) => {
+                          setEditingTask(t);
+                          setIsTaskModalOpen(true);
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
         </div>
 
         {/* Right Column: Desktop Executive Action & Shift Timings (4 Cols on Desktop) */}
@@ -436,7 +491,8 @@ export default function MyTasksTab({
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-blue-500" /> Today&apos;s Shift Hours
+                  <Clock className="w-3 h-3 text-blue-500" /> Today&apos;s Shift
+                  Hours
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
@@ -445,17 +501,17 @@ export default function MyTasksTab({
                   <span
                     className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                       todayDay === 0
-                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
+                        ? "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
                         : todayDay === 6
-                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                          ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                          : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
                     }`}
                   >
                     {todayDay === 0
-                      ? 'Sunday (Off Day)'
+                      ? "Sunday (Off Day)"
                       : todayDay === 6
-                      ? 'Saturday (08.30 - 13.30)'
-                      : 'Mon-Fri (08.30 - 17.30)'}
+                        ? "Saturday (08.30 - 13.30)"
+                        : "Mon-Fri (08.30 - 17.30)"}
                   </span>
                 </div>
               </div>
@@ -496,7 +552,8 @@ export default function MyTasksTab({
               </div>
             </div>
             <p className="text-[10px] text-slate-400">
-              Times are in 24h format and applied directly to morning Day Plan and evening Task Log reports.
+              Times are in 24h format and applied directly to morning Day Plan
+              and evening Task Log reports.
             </p>
           </div>
 
@@ -515,7 +572,7 @@ export default function MyTasksTab({
             <div className="space-y-2.5">
               <button
                 onClick={() => {
-                  setEmailPreviewType('MORNING_PLAN');
+                  setEmailPreviewType("MORNING_PLAN");
                   setIsEmailPreviewOpen(true);
                 }}
                 className="w-full flex items-center justify-between p-3 rounded-2xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-950/60 border border-amber-200/80 dark:border-amber-900/50 text-amber-900 dark:text-amber-200 text-xs font-bold transition-all active:scale-98 shadow-sm group"
@@ -537,9 +594,6 @@ export default function MyTasksTab({
                         </span>
                       ) : null}
                     </div>
-                    <div className="text-[10px] font-normal text-amber-700 dark:text-amber-400">
-                      Preview Subject, To/CC/BCC & Table ({checkInTime})
-                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-200/70 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 text-[11px] font-bold group-hover:bg-amber-300/80 transition-colors">
@@ -550,7 +604,7 @@ export default function MyTasksTab({
 
               <button
                 onClick={() => {
-                  setEmailPreviewType('EVENING_TASKLOG');
+                  setEmailPreviewType("EVENING_TASKLOG");
                   setIsEmailPreviewOpen(true);
                 }}
                 className="w-full flex items-center justify-between p-3 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-950/60 border border-indigo-200/80 dark:border-indigo-900/50 text-indigo-900 dark:text-indigo-200 text-xs font-bold transition-all active:scale-98 shadow-sm group"
@@ -571,9 +625,6 @@ export default function MyTasksTab({
                           Custom Draft Ready
                         </span>
                       ) : null}
-                    </div>
-                    <div className="text-[10px] font-normal text-indigo-700 dark:text-indigo-400">
-                      Preview Subject, To/CC/BCC & Table ({checkOutTime})
                     </div>
                   </div>
                 </div>
@@ -636,7 +687,9 @@ export default function MyTasksTab({
               <div className="bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
                 <div
                   className="bg-gradient-to-r from-blue-600 to-emerald-500 h-full rounded-full transition-all duration-300"
-                  style={{ width: `${Math.min(Number(averageProductivity), 100)}%` }}
+                  style={{
+                    width: `${Math.min(Number(averageProductivity), 100)}%`,
+                  }}
                 />
               </div>
               <div className="flex justify-between text-[10px] text-slate-400">
@@ -685,7 +738,9 @@ export default function MyTasksTab({
                       </span>
                     </div>
                     {m.description && (
-                      <p className="text-[11px] text-slate-500 line-clamp-1">{m.description}</p>
+                      <p className="text-[11px] text-slate-500 line-clamp-1">
+                        {m.description}
+                      </p>
                     )}
                   </div>
                 ))}
@@ -708,7 +763,7 @@ export default function MyTasksTab({
                 onClick={() => setIsLogModalOpen(true)}
                 className="text-xs font-semibold text-blue-600 hover:underline"
               >
-                {todayLogs.length > 0 ? '+ Add' : 'Write'}
+                {todayLogs.length > 0 ? "+ Add" : "Write"}
               </button>
             </div>
 
@@ -719,7 +774,9 @@ export default function MyTasksTab({
                     key={log.id}
                     className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs space-y-1"
                   >
-                    <div className="text-slate-800 dark:text-slate-200">{log.summary}</div>
+                    <div className="text-slate-800 dark:text-slate-200">
+                      {log.summary}
+                    </div>
                     {log.blockers && (
                       <div className="text-rose-600 dark:text-rose-400 font-medium text-[11px]">
                         <strong>Blocker:</strong> {log.blockers}
@@ -790,7 +847,7 @@ export default function MyTasksTab({
         initialCheckInTime={checkInTime}
         initialCheckOutTime={checkOutTime}
         onEmailSent={(msg) => {
-          setStatusMessage({ type: 'success', text: msg });
+          setStatusMessage({ type: "success", text: msg });
           loadDraftStatus();
           setTimeout(() => setStatusMessage(null), 6000);
         }}

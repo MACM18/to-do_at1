@@ -49,6 +49,15 @@ export default function SettingsTab({
 }: SettingsTabProps) {
   const [config, setConfig] = useState(initialConfig);
   const [users, setUsers] = useState<any[]>(initialUsers);
+  const [activeAction, setActiveAction] = useState<
+    | "saveConfig"
+    | "testEmail"
+    | "forceMorning"
+    | "forceEvening"
+    | "changePassword"
+    | "deleteUser"
+    | null
+  >(null);
   const [isPending, startTransition] = useTransition();
   const [statusMessage, setStatusMessage] = useState<{
     type: "success" | "error";
@@ -174,21 +183,26 @@ export default function SettingsTab({
   // Test SMTP Connection
   const handleTestConnection = () => {
     setStatusMessage(null);
+    setActiveAction("saveConfig");
     startTransition(async () => {
-      const res = await testSmtpConnectionAction({
-        smtpHost,
-        smtpPort: Number(smtpPort),
-        smtpSecure,
-        smtpUser,
-        smtpPassword:
-          isEditingPassword && smtpPassword.trim()
-            ? smtpPassword.trim()
-            : undefined,
-      });
-      if (res.success) {
-        setStatusMessage({ type: "success", text: res.message });
-      } else {
-        setStatusMessage({ type: "error", text: res.message });
+      try {
+        const res = await testSmtpConnectionAction({
+          smtpHost,
+          smtpPort: Number(smtpPort),
+          smtpSecure,
+          smtpUser,
+          smtpPassword:
+            isEditingPassword && smtpPassword.trim()
+              ? smtpPassword.trim()
+              : undefined,
+        });
+        if (res.success) {
+          setStatusMessage({ type: "success", text: res.message });
+        } else {
+          setStatusMessage({ type: "error", text: res.message });
+        }
+      } finally {
+        setActiveAction(null);
       }
     });
   };
@@ -204,14 +218,19 @@ export default function SettingsTab({
     }
 
     setStatusMessage(null);
+    setActiveAction("testEmail");
     startTransition(async () => {
-      const target =
-        testEmailAddress.trim() || toRecipients.split(",")[0].trim();
-      const res = await sendTestEmailAction(target);
-      if (res.success) {
-        setStatusMessage({ type: "success", text: res.message });
-      } else {
-        setStatusMessage({ type: "error", text: res.message });
+      try {
+        const target =
+          testEmailAddress.trim() || toRecipients.split(",")[0].trim();
+        const res = await sendTestEmailAction(target);
+        if (res.success) {
+          setStatusMessage({ type: "success", text: res.message });
+        } else {
+          setStatusMessage({ type: "error", text: res.message });
+        }
+      } finally {
+        setActiveAction(null);
       }
     });
   };
@@ -219,12 +238,17 @@ export default function SettingsTab({
   // Manual Force Morning Report
   const handleForceMorningReport = () => {
     setStatusMessage(null);
+    setActiveAction("forceMorning");
     startTransition(async () => {
-      const res = await triggerMorningReportAction(currentUser.id);
-      if (res.success) {
-        setStatusMessage({ type: "success", text: res.message });
-      } else {
-        setStatusMessage({ type: "error", text: res.message });
+      try {
+        const res = await triggerMorningReportAction(currentUser.id);
+        if (res.success) {
+          setStatusMessage({ type: "success", text: res.message });
+        } else {
+          setStatusMessage({ type: "error", text: res.message });
+        }
+      } finally {
+        setActiveAction(null);
       }
     });
   };
@@ -232,12 +256,17 @@ export default function SettingsTab({
   // Manual Force Evening Summary
   const handleForceEveningSummary = () => {
     setStatusMessage(null);
+    setActiveAction("forceEvening");
     startTransition(async () => {
-      const res = await triggerEveningSummaryAction(undefined, currentUser.id);
-      if (res.success) {
-        setStatusMessage({ type: "success", text: res.message });
-      } else {
-        setStatusMessage({ type: "error", text: res.message });
+      try {
+        const res = await triggerEveningSummaryAction(undefined, currentUser.id);
+        if (res.success) {
+          setStatusMessage({ type: "success", text: res.message });
+        } else {
+          setStatusMessage({ type: "error", text: res.message });
+        }
+      } finally {
+        setActiveAction(null);
       }
     });
   };
@@ -947,15 +976,15 @@ export default function SettingsTab({
               <button
                 type="button"
                 onClick={handleTestConnection}
-                disabled={isPending || !smtpUser || !smtpPassword}
+                disabled={Boolean(activeAction) || !smtpUser || !smtpPassword}
                 className="w-full py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                {activeAction === "saveConfig" ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
                 ) : (
                   <Zap className="w-4 h-4 text-amber-500" />
                 )}
-                Test SMTP Connection
+                <span>Test SMTP Connection</span>
               </button>
 
               <div className="space-y-1.5 pt-1">
@@ -969,10 +998,13 @@ export default function SettingsTab({
                 <button
                   type="button"
                   onClick={handleSendTestEmail}
-                  disabled={isPending || !smtpUser || !smtpPassword}
-                  className="w-full py-2 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all disabled:opacity-50"
+                  disabled={Boolean(activeAction) || !smtpUser || !smtpPassword}
+                  className="w-full py-2 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  Send Test Email
+                  {activeAction === "testEmail" && (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  )}
+                  <span>Send Test Email</span>
                 </button>
               </div>
             </div>
@@ -986,29 +1018,39 @@ export default function SettingsTab({
               <button
                 type="button"
                 onClick={handleForceMorningReport}
-                disabled={isPending || !smtpUser || !smtpPassword}
-                className="w-full p-3 rounded-2xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 border border-amber-200 dark:border-amber-900/50 text-left transition-all active:scale-98 disabled:opacity-50"
+                disabled={Boolean(activeAction) || !smtpUser || !smtpPassword}
+                className="w-full p-3 rounded-2xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 border border-amber-200 dark:border-amber-900/50 text-left transition-all active:scale-98 disabled:opacity-50 flex items-center justify-between"
               >
-                <div className="text-xs font-bold text-amber-900 dark:text-amber-300">
-                  Force Send &quot;Day Plan&quot;
+                <div>
+                  <div className="text-xs font-bold text-amber-900 dark:text-amber-300">
+                    Force Send &quot;Day Plan&quot;
+                  </div>
+                  <p className="text-[10px] text-amber-700/80 dark:text-amber-400/80 mt-0.5">
+                    Morning format (no times)
+                  </p>
                 </div>
-                <p className="text-[10px] text-amber-700/80 dark:text-amber-400/80 mt-0.5">
-                  Morning format (no times)
-                </p>
+                {activeAction === "forceMorning" && (
+                  <Loader2 className="w-4 h-4 text-amber-600 animate-spin" />
+                )}
               </button>
 
               <button
                 type="button"
                 onClick={handleForceEveningSummary}
-                disabled={isPending || !smtpUser || !smtpPassword}
-                className="w-full p-3 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:hover:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-900/50 text-left transition-all active:scale-98 disabled:opacity-50"
+                disabled={Boolean(activeAction) || !smtpUser || !smtpPassword}
+                className="w-full p-3 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:hover:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-900/50 text-left transition-all active:scale-98 disabled:opacity-50 flex items-center justify-between"
               >
-                <div className="text-xs font-bold text-indigo-900 dark:text-indigo-300">
-                  Force Send &quot;Task Log&quot;
+                <div>
+                  <div className="text-xs font-bold text-indigo-900 dark:text-indigo-300">
+                    Force Send &quot;Task Log&quot;
+                  </div>
+                  <p className="text-[10px] text-indigo-700/80 dark:text-indigo-400/80 mt-0.5">
+                    Evening format (with times & productivity)
+                  </p>
                 </div>
-                <p className="text-[10px] text-indigo-700/80 dark:text-indigo-400/80 mt-0.5">
-                  Evening format (with times & productivity)
-                </p>
+                {activeAction === "forceEvening" && (
+                  <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" />
+                )}
               </button>
             </div>
           </div>

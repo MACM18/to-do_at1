@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useState, useEffect, useTransition } from 'react';
 import {
   CheckCircle2,
   Circle,
@@ -64,20 +64,19 @@ function renderDueDateBadge(dueDate: Date | string | null | undefined, isDone: b
   }
 
   if (diffDays < 0) {
-    const overdueDays = Math.abs(diffDays);
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300 dark:border-rose-900 animate-pulse">
-        <Flame className="w-3 h-3 text-rose-600 dark:text-rose-400 fill-rose-500" />
-        <span>{overdueDays}d Overdue</span>
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+        <Flame className="w-2.5 h-2.5 text-rose-500" />
+        <span>{Math.abs(diffDays)}d overdue ({monthDay})</span>
       </span>
     );
   }
 
   if (diffDays === 0) {
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
-        <Zap className="w-3 h-3 text-amber-600 dark:text-amber-400 fill-amber-500" />
-        <span>Due Today</span>
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+        <Zap className="w-2.5 h-2.5 text-amber-500" />
+        <span>Due Today ({monthDay})</span>
       </span>
     );
   }
@@ -107,15 +106,27 @@ export default function TeamTaskCard({
   onEdit,
 }: TeamTaskCardProps) {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [customProgress, setCustomProgress] = useState(task.progress || 0);
+  const [currentProgress, setCurrentProgress] = useState(task.progress || 0);
+  const [currentStatus, setCurrentStatus] = useState(task.status);
+  const [currentUserId, setCurrentUserId] = useState(task.userId);
   const [isPending, startTransition] = useTransition();
 
-  const isDone = task.status === 'DONE' || task.progress === 100;
-  const isInProgress = task.status === 'IN_PROGRESS' || (task.progress > 0 && task.progress < 100);
+  useEffect(() => {
+    setCurrentProgress(task.progress || 0);
+    setCurrentStatus(task.status);
+    setCurrentUserId(task.userId);
+  }, [task.progress, task.status, task.userId]);
+
+  const isDone = currentStatus === 'DONE' || currentProgress === 100;
+  const isInProgress = currentStatus === 'IN_PROGRESS' || (currentProgress > 0 && currentProgress < 100);
 
   const handleUpdateProgress = (targetProgress: number, targetStatus?: string) => {
     const clamped = Math.max(0, Math.min(100, Math.round(targetProgress)));
-    setCustomProgress(clamped);
+    const newStatus = targetStatus || (clamped === 100 ? 'DONE' : clamped > 0 ? 'IN_PROGRESS' : 'TODO');
+    
+    // Instant optimistic update on the exact clicked task card
+    setCurrentProgress(clamped);
+    setCurrentStatus(newStatus);
 
     startTransition(async () => {
       await updateTeamTaskStatusAndProgress(task.id, clamped, targetStatus);
@@ -134,7 +145,8 @@ export default function TeamTaskCard({
   };
 
   const handleReassign = (newUserId: string) => {
-    if (!newUserId || newUserId === task.userId) return;
+    if (!newUserId || newUserId === currentUserId) return;
+    setCurrentUserId(newUserId);
     startTransition(async () => {
       await reassignTeamTask(task.id, newUserId);
     });
@@ -229,7 +241,7 @@ export default function TeamTaskCard({
             <button
               onClick={() => handleUpdateProgress(0, 'TODO')}
               className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all ${
-                task.status === 'TODO' && task.progress === 0
+                currentStatus === 'TODO' && currentProgress === 0
                   ? 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 shadow-xs'
                   : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
@@ -237,7 +249,7 @@ export default function TeamTaskCard({
               TODO
             </button>
             <button
-              onClick={() => handleUpdateProgress(task.progress > 0 ? task.progress : 50, 'IN_PROGRESS')}
+              onClick={() => handleUpdateProgress(currentProgress > 0 ? currentProgress : 50, 'IN_PROGRESS')}
               className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all ${
                 isInProgress
                   ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 shadow-xs'
@@ -309,7 +321,7 @@ export default function TeamTaskCard({
               <span>Completion:</span>
             </span>
             <span className="font-bold font-mono text-xs text-slate-800 dark:text-slate-200">
-              {task.progress || 0}%
+              {currentProgress}%
             </span>
           </div>
 
@@ -319,18 +331,18 @@ export default function TeamTaskCard({
               className={`h-full rounded-full transition-all duration-300 ${
                 isDone
                   ? 'bg-emerald-500'
-                  : task.progress > 0
+                  : currentProgress > 0
                   ? 'bg-gradient-to-r from-blue-500 to-indigo-500'
                   : 'bg-slate-300 dark:bg-slate-700'
               }`}
-              style={{ width: `${task.progress || 0}%` }}
+              style={{ width: `${currentProgress}%` }}
             />
           </div>
 
           {/* Quick Preset Buttons (0%, 25%, 50%, 75%, 100%) */}
           <div className="grid grid-cols-5 gap-1.5 pt-0.5">
             {[0, 25, 50, 75, 100].map((val) => {
-              const isSelected = (task.progress || 0) === val;
+              const isSelected = currentProgress === val;
               return (
                 <button
                   key={val}
@@ -359,7 +371,7 @@ export default function TeamTaskCard({
                 <span>Reassign Owner:</span>
               </span>
               <select
-                value={task.userId}
+                value={currentUserId}
                 disabled={isPending}
                 onChange={(e) => handleReassign(e.target.value)}
                 className="px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/70 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer max-w-[170px] truncate transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -367,7 +379,7 @@ export default function TeamTaskCard({
               >
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.name} {u.id === task.userId ? '(Current)' : ''}
+                    {u.name} {u.id === currentUserId ? '(Current)' : ''}
                   </option>
                 ))}
               </select>

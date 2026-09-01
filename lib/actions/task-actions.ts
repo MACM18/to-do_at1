@@ -89,7 +89,7 @@ export async function getTasks(userId?: string) {
         select: { id: true, name: true, email: true, role: true },
       },
     },
-    orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+    orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }],
   });
 }
 
