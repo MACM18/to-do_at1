@@ -20,6 +20,7 @@ model User {
   shifts    DailyShift[]
   meetings  MeetingLog[]
   threads   MonthlyEmailThread[]
+  emailDrafts EmailDraft[]
   createdAt DateTime             @default(now())
   updatedAt DateTime             @updatedAt
 }
@@ -147,4 +148,28 @@ model SavedReport {
   completionRate  Float    @default(0.0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+model EmailDraft {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type          String    // "MORNING_PLAN" | "EVENING_TASKLOG"
+  date          DateTime  @default(now())
+  subject       String
+  threadSubject String?
+  toRecipients  String
+  ccRecipients  String?
+  bccRecipients String?
+  bodyHtml      String
+  bodyText      String?
+  checkInTime   String?
+  checkOutTime  String?
+  status        String    @default("DRAFT") // "DRAFT" | "SENT"
+  sentAt        DateTime?
+  messageId     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([userId, type, date])
 }

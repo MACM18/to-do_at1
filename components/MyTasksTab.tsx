@@ -21,14 +21,17 @@ import {
   Check,
   Users,
   Play,
+  Eye,
 } from 'lucide-react';
 import TaskCard from './TaskCard';
 import TaskModal from './TaskModal';
 import DailyLogModal from './DailyLogModal';
 import MeetingModal from './MeetingModal';
 import CompactTaskCreator from './CompactTaskCreator';
+import EmailPreviewModal from './EmailPreviewModal';
 import { triggerMorningReportAction, triggerEveningSummaryAction } from '@/lib/actions/config-actions';
 import { saveTodayShift, getTodayShift } from '@/lib/actions/shift-actions';
+import { getTodayEmailDraftStatus } from '@/lib/actions/email-draft-actions';
 import { getDayBounds, getLocalTimeDot, formatTo24HrDot } from '@/lib/time-utils';
 
 interface MyTasksTabProps {
@@ -59,6 +62,28 @@ export default function MyTasksTab({
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  // Email Preview Studio state
+  const [isEmailPreviewOpen, setIsEmailPreviewOpen] = useState(false);
+  const [emailPreviewType, setEmailPreviewType] = useState<'MORNING_PLAN' | 'EVENING_TASKLOG'>('MORNING_PLAN');
+  const [draftStatuses, setDraftStatuses] = useState<{
+    morning: { hasDraft: boolean; isSent: boolean; sentAt: string | null };
+    evening: { hasDraft: boolean; isSent: boolean; sentAt: string | null };
+  }>({
+    morning: { hasDraft: false, isSent: false, sentAt: null },
+    evening: { hasDraft: false, isSent: false, sentAt: null },
+  });
+
+  const loadDraftStatus = async () => {
+    if (currentUser?.id) {
+      try {
+        const statuses = await getTodayEmailDraftStatus(currentUser.id);
+        setDraftStatuses(statuses);
+      } catch (err) {
+        console.error('Failed to load email draft statuses', err);
+      }
+    }
+  };
+
   const todayDay = new Date().getDay(); // 0: Sunday, 6: Saturday
   const defaultShiftEnd = todayDay === 6 ? '13.30' : config?.shiftEndTime ? formatTo24HrDot(config.shiftEndTime) : '17.30';
 
@@ -77,6 +102,7 @@ export default function MyTasksTab({
         } else if (todayDay === 6) {
           setCheckOutTime('13.30');
         }
+        loadDraftStatus();
       }
     }
     loadShift();
@@ -489,41 +515,73 @@ export default function MyTasksTab({
             {/* Easy-to-Access Buttons Grid */}
             <div className="space-y-2.5">
               <button
-                onClick={handleSendMorningReport}
-                disabled={isPending}
-                className="w-full flex items-center justify-between p-3 rounded-2xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-950/60 border border-amber-200/80 dark:border-amber-900/50 text-amber-900 dark:text-amber-200 text-xs font-bold transition-all active:scale-98 shadow-sm"
+                onClick={() => {
+                  setEmailPreviewType('MORNING_PLAN');
+                  setIsEmailPreviewOpen(true);
+                }}
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-950/60 border border-amber-200/80 dark:border-amber-900/50 text-amber-900 dark:text-amber-200 text-xs font-bold transition-all active:scale-98 shadow-sm group"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-amber-500 text-white">
+                  <div className="p-2 rounded-xl bg-amber-500 text-white shadow-sm">
                     <Sun className="w-4 h-4" />
                   </div>
                   <div className="text-left">
-                    <div className="font-bold">Send Day Plan</div>
+                    <div className="font-bold flex items-center gap-1.5">
+                      <span>Review Day Plan Email</span>
+                      {draftStatuses.morning.isSent ? (
+                        <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                          Sent
+                        </span>
+                      ) : draftStatuses.morning.hasDraft ? (
+                        <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                          Custom Draft Ready
+                        </span>
+                      ) : null}
+                    </div>
                     <div className="text-[10px] font-normal text-amber-700 dark:text-amber-400">
-                      Uses check-in: {checkInTime}
+                      Preview Subject, To/CC/BCC & Table ({checkInTime})
                     </div>
                   </div>
                 </div>
-                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-3.5 h-3.5 text-amber-600" />}
+                <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-200/70 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 text-[11px] font-bold group-hover:bg-amber-300/80 transition-colors">
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Preview</span>
+                </div>
               </button>
 
               <button
-                onClick={handleSendEveningReport}
-                disabled={isPending}
-                className="w-full flex items-center justify-between p-3 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-950/60 border border-indigo-200/80 dark:border-indigo-900/50 text-indigo-900 dark:text-indigo-200 text-xs font-bold transition-all active:scale-98 shadow-sm"
+                onClick={() => {
+                  setEmailPreviewType('EVENING_TASKLOG');
+                  setIsEmailPreviewOpen(true);
+                }}
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-950/60 border border-indigo-200/80 dark:border-indigo-900/50 text-indigo-900 dark:text-indigo-200 text-xs font-bold transition-all active:scale-98 shadow-sm group"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-indigo-600 text-white">
+                  <div className="p-2 rounded-xl bg-indigo-600 text-white shadow-sm">
                     <Moon className="w-4 h-4" />
                   </div>
                   <div className="text-left">
-                    <div className="font-bold">Send Task Log</div>
+                    <div className="font-bold flex items-center gap-1.5">
+                      <span>Review Task Log Email</span>
+                      {draftStatuses.evening.isSent ? (
+                        <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                          Sent
+                        </span>
+                      ) : draftStatuses.evening.hasDraft ? (
+                        <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                          Custom Draft Ready
+                        </span>
+                      ) : null}
+                    </div>
                     <div className="text-[10px] font-normal text-indigo-700 dark:text-indigo-400">
-                      Uses check-out: {checkOutTime}
+                      Preview Subject, To/CC/BCC & Table ({checkOutTime})
                     </div>
                   </div>
                 </div>
-                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-3.5 h-3.5 text-indigo-600" />}
+                <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-indigo-200/70 dark:bg-indigo-900/60 text-indigo-900 dark:text-indigo-200 text-[11px] font-bold group-hover:bg-indigo-300/80 transition-colors">
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Preview</span>
+                </div>
               </button>
 
               <button
@@ -718,6 +776,25 @@ export default function MyTasksTab({
         onClose={() => setIsMeetingModalOpen(false)}
         userId={currentUser.id}
         editingMeeting={editingMeeting}
+      />
+
+      {/* Email Preview & Customization Studio Modal */}
+      <EmailPreviewModal
+        isOpen={isEmailPreviewOpen}
+        onClose={() => {
+          setIsEmailPreviewOpen(false);
+          loadDraftStatus();
+        }}
+        userId={currentUser.id}
+        userName={currentUser.name}
+        type={emailPreviewType}
+        initialCheckInTime={checkInTime}
+        initialCheckOutTime={checkOutTime}
+        onEmailSent={(msg) => {
+          setStatusMessage({ type: 'success', text: msg });
+          loadDraftStatus();
+          setTimeout(() => setStatusMessage(null), 6000);
+        }}
       />
     </div>
   );

@@ -86,7 +86,7 @@ export function resolveRecipients(config: any): {
  * Retrieves or initializes monthly email thread metadata for threading replies.
  * If the primary "To" recipient list has changed, starts a new clean conversation.
  */
-async function getMonthlyThreadDetails(
+export async function getMonthlyThreadDetails(
   userId: string,
   targetDate: Date = new Date(),
   currentToRecipients: string = ''
@@ -136,7 +136,7 @@ async function getMonthlyThreadDetails(
 /**
  * Records the latest message ID to keep the monthly thread chained.
  */
-async function saveMonthlyThreadMessage(
+export async function saveMonthlyThreadMessage(
   userId: string,
   monthKey: string,
   baseSubject: string,
@@ -186,7 +186,7 @@ async function saveMonthlyThreadMessage(
  * Generates the HTML report table matching the user's template.
  * @param mode 'morning' (Day Plan) | 'evening' (Task Log with times, productivity, blockers & meetings)
  */
-function buildReportTableHtml(options: {
+export function buildReportTableHtml(options: {
   user: { name: string; email: string };
   tasks: any[];
   meetings?: any[];
@@ -564,7 +564,17 @@ export async function sendMorningReportEmail(userId?: string, customCheckInTime?
       toList.join(', ')
     );
 
-    const emailHtml = buildReportTableHtml({
+    // Check if a saved customized draft exists for today
+    const savedDraft = await prisma.emailDraft.findFirst({
+      where: {
+        userId: targetUser.id,
+        type: 'MORNING_PLAN',
+        date: { gte: todayStart, lte: todayEnd },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const emailHtml = savedDraft?.bodyHtml || buildReportTableHtml({
       user: targetUser,
       tasks,
       meetings,
@@ -580,15 +590,20 @@ export async function sendMorningReportEmail(userId?: string, customCheckInTime?
         : undefined,
     });
 
+    const resolvedSubject = savedDraft?.subject || (existingThread ? `Re: ${existingThread.subject}` : baseSubject);
+    const finalToList = savedDraft?.toRecipients ? savedDraft.toRecipients.split(',').map((r) => r.trim()).filter(Boolean) : toList;
+    const finalCcList = savedDraft?.ccRecipients ? savedDraft.ccRecipients.split(',').map((r) => r.trim()).filter(Boolean) : ccList;
+    const finalBccList = savedDraft?.bccRecipients ? savedDraft.bccRecipients.split(',').map((r) => r.trim()).filter(Boolean) : bccList;
+
     const mailOptions: any = {
-      from: `"${config.senderName || 'Daily Focus'}" <${config.smtpUser}>`,
-      subject: existingThread ? `Re: ${existingThread.subject}` : baseSubject,
+      from: `"${config.senderName || 'To-Do MACM'}" <${config.smtpUser}>`,
+      subject: resolvedSubject,
       html: emailHtml,
     };
 
-    if (toList.length > 0) mailOptions.to = toList.join(', ');
-    if (ccList.length > 0) mailOptions.cc = ccList.join(', ');
-    if (bccList.length > 0) mailOptions.bcc = bccList.join(', ');
+    if (finalToList.length > 0) mailOptions.to = finalToList.join(', ');
+    if (finalCcList.length > 0) mailOptions.cc = finalCcList.join(', ');
+    if (finalBccList.length > 0) mailOptions.bcc = finalBccList.join(', ');
 
     if (existingThread && existingThread.rootMessageId) {
       const lastMsg = existingThread.lastMessageId || existingThread.rootMessageId;
@@ -602,17 +617,29 @@ export async function sendMorningReportEmail(userId?: string, customCheckInTime?
 
     const info = await transporter.sendMail(mailOptions);
 
+    if (savedDraft) {
+      await prisma.emailDraft.update({
+        where: { id: savedDraft.id },
+        data: {
+          status: 'SENT',
+          sentAt: new Date(),
+          messageId: info.messageId,
+          updatedAt: new Date(),
+        },
+      });
+    }
+
     await saveMonthlyThreadMessage(
       targetUser.id,
       monthKey,
       baseSubject,
       info.messageId,
-      toList.join(', ')
+      finalToList.join(', ')
     );
 
     return {
       success: true,
-      message: `Day Plan email sent to ${toList.join(', ')} (Message ID: ${info.messageId})`,
+      message: `Day Plan email sent to ${finalToList.join(', ')} (Message ID: ${info.messageId})`,
     };
   } catch (error: any) {
     return { success: false, message: error.message || 'Failed to dispatch Day Plan email.' };
@@ -776,42 +803,59 @@ export async function sendEveningSummaryEmail(
       toList.join(', ')
     );
 
-    let combinedHtml = '';
+    // Check if a saved customized draft exists for today
+    const savedDraft = await prisma.emailDraft.findFirst({
+      where: {
+        userId: primaryUser.id,
+        type: 'EVENING_TASKLOG',
+        date: { gte: todayStart, lte: todayEnd },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let combinedHtml = savedDraft?.bodyHtml || '';
     let totalTasksCount = 0;
 
-    for (const u of users) {
-      totalTasksCount += u.tasks.length + (u.meetings?.length || 0);
-      const userShift = u.shifts[0] || null;
-      const finalShiftEnd =
-        (u.id === targetUserId && customCheckOutTime?.trim()) ||
-        userShift?.shiftEndTime ||
-        defaultEnd;
+    if (!savedDraft) {
+      for (const u of users) {
+        totalTasksCount += u.tasks.length + (u.meetings?.length || 0);
+        const userShift = u.shifts[0] || null;
+        const finalShiftEnd =
+          (u.id === targetUserId && customCheckOutTime?.trim()) ||
+          userShift?.shiftEndTime ||
+          defaultEnd;
 
-      combinedHtml += buildReportTableHtml({
-        user: u,
-        tasks: u.tasks,
-        meetings: u.meetings || [],
-        config,
-        mode: 'evening',
-        targetDate: todayStart,
-        customShift: {
-          shiftStartTime: userShift?.shiftStartTime || config?.shiftStartTime,
-          prepEndTime: userShift?.prepEndTime || config?.prepEndTime,
-          shiftEndTime: finalShiftEnd,
-        },
-      });
-      combinedHtml += '<br/><br/>';
+        combinedHtml += buildReportTableHtml({
+          user: u,
+          tasks: u.tasks,
+          meetings: u.meetings || [],
+          config,
+          mode: 'evening',
+          targetDate: todayStart,
+          customShift: {
+            shiftStartTime: userShift?.shiftStartTime || config?.shiftStartTime,
+            prepEndTime: userShift?.prepEndTime || config?.prepEndTime,
+            shiftEndTime: finalShiftEnd,
+          },
+        });
+        combinedHtml += '<br/><br/>';
+      }
     }
 
+    const resolvedSubject = savedDraft?.subject || (existingThread ? `Re: ${existingThread.subject}` : baseSubject);
+    const finalToList = savedDraft?.toRecipients ? savedDraft.toRecipients.split(',').map((r) => r.trim()).filter(Boolean) : toList;
+    const finalCcList = savedDraft?.ccRecipients ? savedDraft.ccRecipients.split(',').map((r) => r.trim()).filter(Boolean) : ccList;
+    const finalBccList = savedDraft?.bccRecipients ? savedDraft.bccRecipients.split(',').map((r) => r.trim()).filter(Boolean) : bccList;
+
     const mailOptions: any = {
-      from: `"${config.senderName || 'Daily Tracker'}" <${config.smtpUser}>`,
-      subject: existingThread ? `Re: ${existingThread.subject}` : baseSubject,
+      from: `"${config.senderName || 'To-Do MACM'}" <${config.smtpUser}>`,
+      subject: resolvedSubject,
       html: combinedHtml,
     };
 
-    if (toList.length > 0) mailOptions.to = toList.join(', ');
-    if (ccList.length > 0) mailOptions.cc = ccList.join(', ');
-    if (bccList.length > 0) mailOptions.bcc = bccList.join(', ');
+    if (finalToList.length > 0) mailOptions.to = finalToList.join(', ');
+    if (finalCcList.length > 0) mailOptions.cc = finalCcList.join(', ');
+    if (finalBccList.length > 0) mailOptions.bcc = finalBccList.join(', ');
 
     if (existingThread && existingThread.rootMessageId) {
       const lastMsg = existingThread.lastMessageId || existingThread.rootMessageId;
@@ -825,17 +869,29 @@ export async function sendEveningSummaryEmail(
 
     const info = await transporter.sendMail(mailOptions);
 
+    if (savedDraft) {
+      await prisma.emailDraft.update({
+        where: { id: savedDraft.id },
+        data: {
+          status: 'SENT',
+          sentAt: new Date(),
+          messageId: info.messageId,
+          updatedAt: new Date(),
+        },
+      });
+    }
+
     await saveMonthlyThreadMessage(
       primaryUser.id,
       monthKey,
       baseSubject,
       info.messageId,
-      toList.join(', ')
+      finalToList.join(', ')
     );
 
     return {
       success: true,
-      message: `Task Log summary email sent to ${toList.join(', ')} (Message ID: ${info.messageId})`,
+      message: `Task Log summary email sent to ${finalToList.join(', ')} (Message ID: ${info.messageId})`,
     };
   } catch (error: any) {
     return { success: false, message: error.message || 'Failed to dispatch Task Log email.' };

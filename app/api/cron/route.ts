@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendMorningTodoList, sendDailySummaryReport } from '@/lib/mailer';
 import { processRecurringTasks } from '@/lib/recurrence';
+import { pruneOldEmailDrafts } from '@/lib/actions/email-draft-actions';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -9,6 +10,9 @@ export async function GET(request: Request) {
 
   try {
     const results: Record<string, any> = {};
+
+    // Auto-prune email drafts older than 30 days
+    await pruneOldEmailDrafts();
 
     if (!type || type === 'recurrence' || type === 'all') {
       const recResult = await processRecurringTasks();
