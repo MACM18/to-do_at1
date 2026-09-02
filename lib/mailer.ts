@@ -485,6 +485,12 @@ export async function sendMorningReportEmail(userId?: string, customCheckInTime?
     }
     if (!targetUser) {
       targetUser = await prisma.user.findFirst({
+        where: { isActive: true, role: { in: ['LEAD', 'ADMIN'] } },
+        orderBy: { createdAt: 'asc' },
+      });
+    }
+    if (!targetUser) {
+      targetUser = await prisma.user.findFirst({
         where: { isActive: true },
         orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
       });
@@ -655,14 +661,35 @@ export async function sendEveningSummaryEmail(
 
     const { startOfDay: todayStart, endOfDay: todayEnd } = getDayBounds(targetDate);
 
-    const userWhere = targetUserId ? { id: targetUserId, isActive: true } : { isActive: true };
+    // Resolve targetUser: explicitly passed userId, or primary Lead/Admin
+    let targetUser = null;
+    if (targetUserId) {
+      targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+    }
+    if (!targetUser) {
+      targetUser = await prisma.user.findFirst({
+        where: { isActive: true, role: { in: ['LEAD', 'ADMIN'] } },
+        orderBy: { createdAt: 'asc' },
+      });
+    }
+    if (!targetUser) {
+      targetUser = await prisma.user.findFirst({
+        where: { isActive: true },
+        orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+      });
+    }
+
+    if (!targetUser) {
+      throw new Error('No active user found to send report for.');
+    }
+
     const isSaturday = todayStart.getDay() === 6;
     const defaultEnd = isSaturday ? '13.30' : config?.shiftEndTime ? formatTo24HrDot(config.shiftEndTime) : '17.30';
 
-    if (targetUserId && customCheckOutTime && customCheckOutTime.trim()) {
+    if (customCheckOutTime && customCheckOutTime.trim()) {
       const formattedCheckout = formatTo24HrDot(customCheckOutTime);
       const existing = await prisma.dailyShift.findFirst({
-        where: { userId: targetUserId, date: { gte: todayStart, lte: todayEnd } },
+        where: { userId: targetUser.id, date: { gte: todayStart, lte: todayEnd } },
       });
       if (existing) {
         await prisma.dailyShift.update({
@@ -672,7 +699,7 @@ export async function sendEveningSummaryEmail(
       } else {
         await prisma.dailyShift.create({
           data: {
-            userId: targetUserId,
+            userId: targetUser.id,
             date: todayStart,
             shiftEndTime: formattedCheckout,
           },
@@ -680,122 +707,97 @@ export async function sendEveningSummaryEmail(
       }
     }
 
-    // Auto-complete daily tasks by checkout time if not yet completed by the user
-    const targetUsersList = await prisma.user.findMany({
-      where: userWhere,
-      include: {
-        shifts: {
-          where: {
-            date: { gte: todayStart, lte: todayEnd },
-          },
-        },
+    // Retrieve targetUser's shift for today
+    const userShift = await prisma.dailyShift.findFirst({
+      where: {
+        userId: targetUser.id,
+        date: { gte: todayStart, lte: todayEnd },
       },
     });
 
-    for (const u of targetUsersList) {
-      const userShift = u.shifts[0] || null;
-      let finalShiftEnd =
-        (u.id === targetUserId && customCheckOutTime?.trim() ? formatTo24HrDot(customCheckOutTime) : null) ||
-        (userShift?.shiftEndTime ? formatTo24HrDot(userShift.shiftEndTime) : null) ||
-        defaultEnd;
+    let finalShiftEnd =
+      (customCheckOutTime?.trim() ? formatTo24HrDot(customCheckOutTime) : null) ||
+      (userShift?.shiftEndTime ? formatTo24HrDot(userShift.shiftEndTime) : null) ||
+      defaultEnd;
 
-      // On Saturday, if shift end time is unset or defaulting to weekday 17.30 / 5.30, force 13.30
-      if (isSaturday && (!finalShiftEnd || finalShiftEnd === '17.30' || finalShiftEnd === '5.30')) {
-        finalShiftEnd = '13.30';
-      }
+    if (isSaturday && (!finalShiftEnd || finalShiftEnd === '17.30' || finalShiftEnd === '5.30')) {
+      finalShiftEnd = '13.30';
+    }
 
-      // Find all daily recurring tasks for today
-      const allDailyTasks = await prisma.task.findMany({
-        where: {
-          userId: u.id,
-          recurrence: 'DAILY',
-        },
-        include: { subtasks: true },
-      });
+    // Auto-complete daily tasks ONLY for targetUser by checkout time if not yet completed
+    const allDailyTasks = await prisma.task.findMany({
+      where: {
+        userId: targetUser.id,
+        recurrence: 'DAILY',
+      },
+      include: { subtasks: true },
+    });
 
-      const shiftStartVal = formatTo24HrDot(userShift?.shiftStartTime || config?.shiftStartTime || '08.30');
+    const shiftStartVal = formatTo24HrDot(userShift?.shiftStartTime || config?.shiftStartTime || '08.30');
 
-      for (const t of allDailyTasks) {
-        // Complete all subtasks if not yet done
-        if (t.subtasks && t.subtasks.length > 0) {
-          await prisma.subtask.updateMany({
-            where: { taskId: t.id },
-            data: { isDone: true },
-          });
-        }
-
-        // Determine correct end time: On Saturday, override 5.30/17.30 with 13.30 (or custom checkout)
-        let resolvedEndTime = t.endTime ? formatTo24HrDot(t.endTime) : null;
-        if (!resolvedEndTime || (isSaturday && (resolvedEndTime === '17.30' || resolvedEndTime === '5.30'))) {
-          resolvedEndTime = finalShiftEnd;
-        }
-
-        // Complete daily task with 100% progress, start time from check-in, and Saturday/weekday checkout end time
-        await prisma.task.update({
-          where: { id: t.id },
-          data: {
-            status: 'DONE',
-            progress: 100,
-            startTime: t.startTime ? formatTo24HrDot(t.startTime) : shiftStartVal,
-            endTime: resolvedEndTime,
-          },
+    for (const t of allDailyTasks) {
+      if (t.subtasks && t.subtasks.length > 0) {
+        await prisma.subtask.updateMany({
+          where: { taskId: t.id },
+          data: { isDone: true },
         });
       }
+
+      let resolvedEndTime = t.endTime ? formatTo24HrDot(t.endTime) : null;
+      if (!resolvedEndTime || (isSaturday && (resolvedEndTime === '17.30' || resolvedEndTime === '5.30'))) {
+        resolvedEndTime = finalShiftEnd;
+      }
+
+      await prisma.task.update({
+        where: { id: t.id },
+        data: {
+          status: 'DONE',
+          progress: 100,
+          startTime: t.startTime ? formatTo24HrDot(t.startTime) : shiftStartVal,
+          endTime: resolvedEndTime,
+        },
+      });
     }
 
-    // Query updated users and tasks
-    const users = await prisma.user.findMany({
-      where: userWhere,
+    // Query updated tasks strictly for targetUser ONLY
+    const tasks = await prisma.task.findMany({
+      where: {
+        userId: targetUser.id,
+        OR: [
+          { status: { in: ['TODO', 'IN_PROGRESS'] } },
+          { recurrence: { in: ['DAILY', 'WEEKLY'] } },
+          { createdAt: { gte: todayStart, lte: todayEnd } },
+          { updatedAt: { gte: todayStart, lte: todayEnd } },
+        ],
+      },
       include: {
-        tasks: {
-          where: {
-            OR: [
-              { status: { in: ['TODO', 'IN_PROGRESS'] } },
-              { recurrence: { in: ['DAILY', 'WEEKLY'] } },
-              { createdAt: { gte: todayStart, lte: todayEnd } },
-              { updatedAt: { gte: todayStart, lte: todayEnd } },
-            ],
-          },
-          include: {
-            subtasks: {
-              orderBy: { createdAt: 'asc' },
-            },
-          },
+        subtasks: {
           orderBy: { createdAt: 'asc' },
         },
-        meetings: {
-          where: {
-            date: { gte: todayStart, lte: todayEnd },
-          },
-          orderBy: { startTime: 'asc' },
-        },
-        shifts: {
-          where: {
-            date: { gte: todayStart, lte: todayEnd },
-          },
-        },
       },
-      orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+      orderBy: [{ createdAt: 'asc' }],
     });
 
-    if (users.length === 0) {
-      throw new Error('No active user found to send report for.');
-    }
-
-    const primaryUser = users[0];
+    const meetings = await prisma.meetingLog.findMany({
+      where: {
+        userId: targetUser.id,
+        date: { gte: todayStart, lte: todayEnd },
+      },
+      orderBy: { startTime: 'asc' },
+    });
 
     const transporter = await getTransporter();
 
     const { monthKey, baseSubject, existingThread } = await getMonthlyThreadDetails(
-      primaryUser.id,
+      targetUser.id,
       todayStart,
       toList.join(', ')
     );
 
-    // Check if a saved customized draft exists for today
+    // Check if a saved customized draft exists for today for this user
     const savedDraft = await prisma.emailDraft.findFirst({
       where: {
-        userId: primaryUser.id,
+        userId: targetUser.id,
         type: 'EVENING_TASKLOG',
         date: { gte: todayStart, lte: todayEnd },
       },
@@ -803,32 +805,22 @@ export async function sendEveningSummaryEmail(
     });
 
     let combinedHtml = savedDraft?.bodyHtml || '';
-    let totalTasksCount = 0;
 
-    if (!savedDraft) {
-      for (const u of users) {
-        totalTasksCount += u.tasks.length + (u.meetings?.length || 0);
-        const userShift = u.shifts[0] || null;
-        const finalShiftEnd =
-          (u.id === targetUserId && customCheckOutTime?.trim()) ||
-          userShift?.shiftEndTime ||
-          defaultEnd;
-
-        combinedHtml += buildReportTableHtml({
-          user: u,
-          tasks: u.tasks,
-          meetings: u.meetings || [],
-          config,
-          mode: 'evening',
-          targetDate: todayStart,
-          customShift: {
-            shiftStartTime: userShift?.shiftStartTime || config?.shiftStartTime,
-            prepEndTime: userShift?.prepEndTime || config?.prepEndTime,
-            shiftEndTime: finalShiftEnd,
-          },
-        });
-        combinedHtml += '<br/><br/>';
-      }
+    // If no customized draft was saved, generate HTML strictly for targetUser only (matching preview)
+    if (!combinedHtml) {
+      combinedHtml = buildReportTableHtml({
+        user: targetUser,
+        tasks: tasks,
+        meetings: meetings || [],
+        config,
+        mode: 'evening',
+        targetDate: todayStart,
+        customShift: {
+          shiftStartTime: userShift?.shiftStartTime || config?.shiftStartTime,
+          prepEndTime: userShift?.prepEndTime || config?.prepEndTime,
+          shiftEndTime: finalShiftEnd,
+        },
+      });
     }
 
     const resolvedSubject = savedDraft?.subject || (existingThread ? `Re: ${existingThread.subject}` : baseSubject);
@@ -871,7 +863,7 @@ export async function sendEveningSummaryEmail(
     }
 
     await saveMonthlyThreadMessage(
-      primaryUser.id,
+      targetUser.id,
       monthKey,
       baseSubject,
       info.messageId,
