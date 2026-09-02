@@ -86,16 +86,21 @@ export async function initScheduler() {
         { timezone: SCHEDULER_TIMEZONE }
       );
 
-      // 2B: Saturday Task Log (Saturday at 13:30 / 1:30 PM Shift End)
-      const saturdayCronExpr = '30 13 * * 6';
+      // 2B: Saturday Task Log (Configurable Saturday auto-send, defaults to 13:30)
+      const saturdayTime = config.saturdayReportTime || '13:30';
+      const [satHourStr, satMinuteStr] = saturdayTime.split(':');
+      const satMinute = parseInt(satMinuteStr || '30', 10);
+      const satHour = parseInt(satHourStr || '13', 10);
+
+      const saturdayCronExpr = `${satMinute} ${satHour} * * 6`;
       console.log(
-        `[Cron] Scheduling Saturday Task Log at 13:30 (1:30 PM) +05:30 (${saturdayCronExpr})`
+        `[Cron] Scheduling Saturday Task Log at ${saturdayTime} +05:30 (${saturdayCronExpr})`
       );
 
       eveningSaturdayTask = cron.schedule(
         saturdayCronExpr,
         async () => {
-          console.log('[Cron] Triggering scheduled Saturday task log at 1:30 PM...');
+          console.log(`[Cron] Triggering scheduled Saturday task log at ${saturdayTime}...`);
           try {
             const result = await sendDailySummaryReport();
             console.log('[Cron] Saturday task log sent:', result.message);

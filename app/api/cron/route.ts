@@ -19,14 +19,31 @@ export async function GET(request: Request) {
       results.recurrence = recResult;
     }
 
-    if (type === 'morning' || type === 'all') {
-      const morningRes = await sendMorningTodoList();
-      results.morning = morningRes;
+    const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
+
+    if (type === 'morning') {
+      if (config?.autoSendMorningReport) {
+        const morningRes = await sendMorningTodoList();
+        results.morning = morningRes;
+      } else {
+        results.morning = { skipped: 'Morning plan auto-dispatch is disabled (manual review only).' };
+      }
     }
 
     if (type === 'evening' || type === 'all') {
-      const eveningRes = await sendDailySummaryReport();
-      results.evening = eveningRes;
+      const today = new Date();
+      const isSunday = today.getDay() === 0;
+
+      if (config?.autoSendDailyLog && !isSunday) {
+        const eveningRes = await sendDailySummaryReport();
+        results.evening = eveningRes;
+      } else {
+        results.evening = {
+          skipped: isSunday
+            ? 'Sunday is an off day.'
+            : 'Auto-send daily log is disabled in settings.',
+        };
+      }
     }
 
     return NextResponse.json({

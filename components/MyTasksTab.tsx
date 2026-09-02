@@ -510,8 +510,8 @@ export default function MyTasksTab({
                     {todayDay === 0
                       ? "Sunday (Off Day)"
                       : todayDay === 6
-                        ? "Saturday (08.30 - 13.30)"
-                        : "Mon-Fri (08.30 - 17.30)"}
+                        ? `Saturday (${config?.shiftStartTime || "08.30"} - ${config?.saturdayShiftEndTime || "13.30"})`
+                        : `Mon-Fri (${config?.shiftStartTime || "08.30"} - ${config?.shiftEndTime || "17.30"})`}
                   </span>
                 </div>
               </div>

@@ -684,7 +684,9 @@ export async function sendEveningSummaryEmail(
     }
 
     const isSaturday = todayStart.getDay() === 6;
-    const defaultEnd = isSaturday ? '13.30' : config?.shiftEndTime ? formatTo24HrDot(config.shiftEndTime) : '17.30';
+    const satEnd = config?.saturdayShiftEndTime ? formatTo24HrDot(config.saturdayShiftEndTime) : '13.30';
+    const weekdayEnd = config?.shiftEndTime ? formatTo24HrDot(config.shiftEndTime) : '17.30';
+    const defaultEnd = isSaturday ? satEnd : weekdayEnd;
 
     if (customCheckOutTime && customCheckOutTime.trim()) {
       const formattedCheckout = formatTo24HrDot(customCheckOutTime);
@@ -721,7 +723,7 @@ export async function sendEveningSummaryEmail(
       defaultEnd;
 
     if (isSaturday && (!finalShiftEnd || finalShiftEnd === '17.30' || finalShiftEnd === '5.30')) {
-      finalShiftEnd = '13.30';
+      finalShiftEnd = satEnd;
     }
 
     // Auto-complete daily tasks ONLY for targetUser by checkout time if not yet completed

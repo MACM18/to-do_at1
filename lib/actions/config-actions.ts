@@ -27,9 +27,11 @@ export async function getConfig() {
       bccRecipients: '',
       morningReportTime: '08:00',
       eveningReportTime: '18:00',
+      saturdayReportTime: '13:30',
       shiftStartTime: '08.30',
       prepEndTime: '08.45',
       shiftEndTime: '17.30',
+      saturdayShiftEndTime: '13.30',
       autoSendMorningReport: false,
       autoSendDailyLog: false,
     };
@@ -55,9 +57,11 @@ export async function getConfig() {
         bccRecipients: '',
         morningReportTime: '08:00',
         eveningReportTime: '18:00',
+        saturdayReportTime: '13:30',
         shiftStartTime: '08.30',
         prepEndTime: '08.45',
         shiftEndTime: '17.30',
+        saturdayShiftEndTime: '13.30',
         autoSendMorningReport: false,
         autoSendDailyLog: false,
       },
@@ -80,9 +84,11 @@ export async function updateConfig(data: {
   bccRecipients?: string;
   morningReportTime?: string;
   eveningReportTime?: string;
+  saturdayReportTime?: string;
   shiftStartTime?: string;
   prepEndTime?: string;
   shiftEndTime?: string;
+  saturdayShiftEndTime?: string;
   autoSendMorningReport?: boolean;
   autoSendDailyLog?: boolean;
   defaultUserId?: string;
@@ -109,12 +115,16 @@ export async function updateConfig(data: {
     updatePayload.morningReportTime = data.morningReportTime.trim();
   if (data.eveningReportTime !== undefined)
     updatePayload.eveningReportTime = data.eveningReportTime.trim();
+  if (data.saturdayReportTime !== undefined)
+    updatePayload.saturdayReportTime = data.saturdayReportTime.trim();
   if (data.shiftStartTime !== undefined)
     updatePayload.shiftStartTime = formatTo24HrDot(data.shiftStartTime);
   if (data.prepEndTime !== undefined)
     updatePayload.prepEndTime = formatTo24HrDot(data.prepEndTime);
   if (data.shiftEndTime !== undefined)
     updatePayload.shiftEndTime = formatTo24HrDot(data.shiftEndTime);
+  if (data.saturdayShiftEndTime !== undefined)
+    updatePayload.saturdayShiftEndTime = formatTo24HrDot(data.saturdayShiftEndTime);
   if (data.autoSendMorningReport !== undefined)
     updatePayload.autoSendMorningReport = Boolean(data.autoSendMorningReport);
   if (data.autoSendDailyLog !== undefined)

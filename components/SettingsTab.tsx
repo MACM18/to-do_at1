@@ -100,6 +100,9 @@ export default function SettingsTab({
   const [eveningReportTime, setEveningReportTime] = useState(
     initialConfig?.eveningReportTime || "17:30",
   );
+  const [saturdayReportTime, setSaturdayReportTime] = useState(
+    initialConfig?.saturdayReportTime || "13:30",
+  );
   const [shiftStartTime, setShiftStartTime] = useState(
     formatTo24HrDot(initialConfig?.shiftStartTime || "08.30"),
   );
@@ -108,6 +111,9 @@ export default function SettingsTab({
   );
   const [shiftEndTime, setShiftEndTime] = useState(
     formatTo24HrDot(initialConfig?.shiftEndTime || "17.30"),
+  );
+  const [saturdayShiftEndTime, setSaturdayShiftEndTime] = useState(
+    formatTo24HrDot(initialConfig?.saturdayShiftEndTime || "13.30"),
   );
   const [autoSendDailyLog, setAutoSendDailyLog] = useState(
     Boolean(initialConfig?.autoSendDailyLog),
@@ -150,9 +156,11 @@ export default function SettingsTab({
           bccRecipients,
           morningReportTime,
           eveningReportTime,
+          saturdayReportTime,
           shiftStartTime,
           prepEndTime,
           shiftEndTime,
+          saturdayShiftEndTime,
           autoSendDailyLog,
         };
 
@@ -665,7 +673,7 @@ export default function SettingsTab({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                 <label className="flex items-center gap-2.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 cursor-pointer">
                   <input
                     type="checkbox"
@@ -678,19 +686,31 @@ export default function SettingsTab({
                       Auto-Send Evening Task Log
                     </div>
                     <div className="text-[10px] text-slate-500">
-                      Mon-Fri at configured time, Sat at 1:30 PM (Sun off)
+                      Mon-Fri & Sat auto dispatch (Sun off)
                     </div>
                   </div>
                 </label>
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                    Weekday Auto-Send Time (Mon - Fri)
+                    Weekday Auto-Send (Mon - Fri)
                   </label>
                   <input
                     type="time"
                     value={eveningReportTime}
                     onChange={(e) => setEveningReportTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                    Saturday Auto-Send
+                  </label>
+                  <input
+                    type="time"
+                    value={saturdayReportTime}
+                    onChange={(e) => setSaturdayReportTime(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -708,7 +728,7 @@ export default function SettingsTab({
                 </h3>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                     Shift Start (e.g. 08.30)
@@ -744,6 +764,19 @@ export default function SettingsTab({
                     value={shiftEndTime}
                     onChange={(e) => setShiftEndTime(e.target.value)}
                     placeholder="17.30"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                    Saturday Shift End (e.g. 13.30)
+                  </label>
+                  <input
+                    type="text"
+                    value={saturdayShiftEndTime}
+                    onChange={(e) => setSaturdayShiftEndTime(e.target.value)}
+                    placeholder="13.30"
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100"
                   />
                 </div>
