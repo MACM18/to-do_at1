@@ -7,12 +7,14 @@ import { createTask } from '@/lib/actions/task-actions';
 interface TeamTaskCreatorProps {
   userId: string;
   userName?: string;
+  targetDate?: string;
   onCreated?: () => void;
 }
 
 export default function TeamTaskCreator({
   userId,
   userName,
+  targetDate,
   onCreated,
 }: TeamTaskCreatorProps) {
   const [title, setTitle] = useState('');
@@ -34,6 +36,7 @@ export default function TeamTaskCreator({
         priority: 'High',
         assignedBy: 'Myself',
         recurrence: 'NONE',
+        targetDate: targetDate || undefined,
       });
 
       setTitle('');
@@ -58,7 +61,11 @@ export default function TeamTaskCreator({
             required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder={userName ? `Log task from morning email for ${userName}...` : 'Log task from morning email...'}
+            placeholder={
+              userName
+                ? `Log task for ${userName}...`
+                : 'Log task for team member...'
+            }
             className="flex-1 px-2 py-1.5 text-xs sm:text-sm bg-transparent text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
           />
 

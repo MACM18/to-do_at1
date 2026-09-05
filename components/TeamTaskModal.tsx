@@ -20,6 +20,7 @@ interface TeamTaskModalProps {
   userName?: string;
   users?: any[];
   editingTask?: any;
+  targetDate?: string;
 }
 
 export default function TeamTaskModal({
@@ -29,6 +30,7 @@ export default function TeamTaskModal({
   userName,
   users = [],
   editingTask,
+  targetDate,
 }: TeamTaskModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -112,6 +114,7 @@ export default function TeamTaskModal({
           priority: 'High',
           assignedBy: 'Myself',
           recurrence: 'NONE',
+          targetDate: targetDate || undefined,
         });
       }
       onClose();

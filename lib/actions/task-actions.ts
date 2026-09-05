@@ -107,6 +107,7 @@ export async function createTask(formData: {
   assignedBy?: string;
   subtaskTitles?: string[];
   subtasks?: { title: string; weight?: number | null }[];
+  targetDate?: string | Date | null;
 }) {
   if (!formData.title?.trim()) {
     throw new Error('Task title is required');
@@ -141,6 +142,12 @@ export async function createTask(formData: {
     initialStatus = calculated.status;
   }
 
+  let createdDate: Date | undefined = undefined;
+  if (formData.targetDate) {
+    const { dateStr } = getLocalDateParts(formData.targetDate);
+    createdDate = new Date(`${dateStr}T12:00:00.000+05:30`);
+  }
+
   const task = await prisma.task.create({
     data: {
       title: formData.title.trim(),
@@ -154,6 +161,8 @@ export async function createTask(formData: {
       assignedBy: formData.assignedBy?.trim() || 'Myself',
       status: initialStatus,
       progress: initialProgress,
+      createdAt: createdDate,
+      updatedAt: createdDate,
       subtasks: {
         create: subtasksData,
       },

@@ -10,10 +10,14 @@ import {
   AlertCircle,
   FileText,
   Calendar,
+  CalendarDays,
   FileSpreadsheet,
   Printer,
   Mail,
+  ChevronLeft,
   ChevronRight,
+  RotateCcw,
+  History,
   Sparkles,
   Copy,
 } from 'lucide-react';
@@ -23,7 +27,12 @@ import TeamTaskCreator from './TeamTaskCreator';
 import UserModal from './UserModal';
 import MonthlyReportModal from './MonthlyReportModal';
 import ExecutiveReportModal from './ExecutiveReportModal';
-import { getDayBounds, getReportTimeSlots } from '@/lib/time-utils';
+import {
+  getDayBounds,
+  getReportTimeSlots,
+  getLocalDateParts,
+  formatLocalDate,
+} from '@/lib/time-utils';
 
 interface TeamViewTabProps {
   currentUser: any;
@@ -46,6 +55,8 @@ export default function TeamViewTab({
   const defaultSelectedUser =
     otherMembers[0] || activeUsers.find((u) => u.id !== loggedInUserId) || activeUsers[0];
 
+  const todayDateStr = getLocalDateParts(new Date()).dateStr;
+  const [selectedDate, setSelectedDate] = useState<string>(todayDateStr);
   const [selectedUserId, setSelectedUserId] = useState<string>(
     defaultSelectedUser?.id || 'ALL'
   );
@@ -56,8 +67,30 @@ export default function TeamViewTab({
   const [executiveReportType, setExecutiveReportType] = useState<'MONDAY' | 'SATURDAY' | 'MONTHLY'>('MONDAY');
   const [editingTask, setEditingTask] = useState<any>(null);
 
-  const { startOfDay: todayStart } = getDayBounds(new Date());
-  const { isMondaySlot, isSaturdaySlot, isMonthlySlot, isLastSaturday } = getReportTimeSlots(new Date());
+  const isToday = selectedDate === todayDateStr;
+  const {
+    startOfDay: targetDayStart,
+    endOfDay: targetDayEnd,
+    formattedShort: selectedDateShort,
+    formattedLong: selectedDateLong,
+  } = getDayBounds(new Date(selectedDate));
+  const { isMondaySlot, isSaturdaySlot, isMonthlySlot, isLastSaturday } = getReportTimeSlots(new Date(selectedDate));
+
+  const handlePrevDay = () => {
+    const current = new Date(`${selectedDate}T12:00:00.000+05:30`);
+    current.setDate(current.getDate() - 1);
+    setSelectedDate(getLocalDateParts(current).dateStr);
+  };
+
+  const handleNextDay = () => {
+    const current = new Date(`${selectedDate}T12:00:00.000+05:30`);
+    current.setDate(current.getDate() + 1);
+    setSelectedDate(getLocalDateParts(current).dateStr);
+  };
+
+  const handleResetToday = () => {
+    setSelectedDate(todayDateStr);
+  };
 
   const selectedUser =
     activeUsers.find((u) => u.id === selectedUserId) ||
@@ -69,29 +102,37 @@ export default function TeamViewTab({
   const teamCompletionPercentage =
     totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-  // Selected member's tasks
+  // Selected member's tasks partitioned by selected date
   const memberTasks = selectedUser ? tasks.filter((t) => t.userId === selectedUser.id) : [];
   const memberCarryOver = memberTasks.filter(
-    (t) => new Date(t.createdAt) < todayStart && t.recurrence === 'NONE' && t.status !== 'DONE'
+    (t) => new Date(t.createdAt) < targetDayStart && t.recurrence === 'NONE' && t.status !== 'DONE'
   );
   const memberActive = memberTasks.filter(
     (t) =>
-      (new Date(t.createdAt) >= todayStart || t.recurrence === 'DAILY' || t.recurrence === 'WEEKLY') &&
+      ((new Date(t.createdAt) >= targetDayStart && new Date(t.createdAt) <= targetDayEnd) ||
+        t.recurrence === 'DAILY' ||
+        t.recurrence === 'WEEKLY') &&
       t.status !== 'DONE'
   );
   const memberCompleted = memberTasks.filter(
     (t) =>
       t.status === 'DONE' &&
-      (new Date(t.updatedAt) >= todayStart ||
-        new Date(t.createdAt) >= todayStart ||
+      ((new Date(t.updatedAt) >= targetDayStart && new Date(t.updatedAt) <= targetDayEnd) ||
+        (new Date(t.createdAt) >= targetDayStart && new Date(t.createdAt) <= targetDayEnd) ||
         t.recurrence === 'DAILY' ||
         t.recurrence === 'WEEKLY')
   );
+
+  const dayTotalCount = memberActive.length + memberCompleted.length;
   const memberRate =
-    memberTasks.length > 0 ? Math.round((memberCompleted.length / memberTasks.length) * 100) : 0;
+    dayTotalCount > 0
+      ? Math.round((memberCompleted.length / dayTotalCount) * 100)
+      : memberCompleted.length > 0
+        ? 100
+        : 0;
 
   const memberLogs = selectedUser
-    ? logs.filter((l) => l.userId === selectedUser.id && new Date(l.date) >= todayStart)
+    ? logs.filter((l) => l.userId === selectedUser.id && new Date(l.date) >= targetDayStart && new Date(l.date) <= targetDayEnd)
     : [];
 
   return (
@@ -100,6 +141,67 @@ export default function TeamViewTab({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Member Deliverables & Task Feed (8 Cols on Desktop) */}
         <div className="lg:col-span-8 space-y-5">
+          {/* Date Selector & Quick Day Navigation Bar */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 w-full sm:w-auto">
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-2xl border border-slate-200/60 dark:border-slate-700/60">
+                <button
+                  type="button"
+                  onClick={handlePrevDay}
+                  className="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-all shadow-xs active:scale-95"
+                  title="Previous Day"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+                  className="px-2.5 py-1 text-xs font-bold bg-transparent text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
+                  title="Select specific date"
+                />
+                <button
+                  type="button"
+                  onClick={handleNextDay}
+                  className="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-all shadow-xs active:scale-95"
+                  title="Next Day"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleResetToday}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs font-bold transition-all shadow-xs active:scale-95 ${
+                  isToday
+                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60'
+                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/20'
+                }`}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Today</span>
+              </button>
+            </div>
+
+            {/* Visual Date Indicator / Status Banner */}
+            <div className="flex items-center gap-2 text-xs w-full sm:w-auto justify-end">
+              {!isToday ? (
+                <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/50 text-amber-800 dark:text-amber-300 font-semibold shadow-xs">
+                  <History className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>
+                    Logging for <strong>{selectedDateShort}</strong> (Past Date)
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-semibold text-xs">
+                  <CalendarDays className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Today: {selectedDateShort}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Member Profile Header Card */}
           {selectedUser && (
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm space-y-4">
@@ -130,7 +232,7 @@ export default function TeamViewTab({
                 <div className="flex items-center gap-3">
                   <div className="text-right">
                     <div className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                      {memberCompleted.length}/{memberTasks.length} Completed ({memberRate}%)
+                      {memberCompleted.length}/{dayTotalCount} Completed ({memberRate}%)
                     </div>
                     <div className="w-32 bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden mt-1">
                       <div
@@ -142,7 +244,7 @@ export default function TeamViewTab({
                 </div>
               </div>
 
-              {/* Member's Today's Work Log */}
+              {/* Member's Work Log on Selected Date */}
               {memberLogs.length > 0 && (
                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
                   {memberLogs.map((log) => (
@@ -170,6 +272,7 @@ export default function TeamViewTab({
             <TeamTaskCreator
               userId={selectedUser.id}
               userName={selectedUser.name}
+              targetDate={selectedDate}
             />
           )}
 
@@ -238,7 +341,9 @@ export default function TeamViewTab({
             <div className="pt-3 border-t border-slate-200/80 dark:border-slate-800 space-y-2">
               <div className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Today&apos;s Completed Tasks ({memberCompleted.length})</span>
+                <span>
+                  {isToday ? "Today's" : selectedDateShort} Completed Tasks ({memberCompleted.length})
+                </span>
               </div>
               <div className="space-y-1.5">
                 {memberCompleted.map((task) => (
@@ -422,8 +527,15 @@ export default function TeamViewTab({
                 ...activeUsers.filter((u) => u.id !== currentUser.id),
                 ...activeUsers.filter((u) => u.id === currentUser.id),
               ].map((u) => {
-                const uTasks = tasks.filter((t) => t.userId === u.id);
-                const uDone = uTasks.filter((t) => t.status === 'DONE').length;
+                const uDayTasks = tasks.filter(
+                  (t) =>
+                    t.userId === u.id &&
+                    (((new Date(t.createdAt) >= targetDayStart && new Date(t.createdAt) <= targetDayEnd) ||
+                      (t.status === 'DONE' && new Date(t.updatedAt) >= targetDayStart && new Date(t.updatedAt) <= targetDayEnd)) ||
+                      t.recurrence === 'DAILY' ||
+                      t.recurrence === 'WEEKLY')
+                );
+                const uDayDone = uDayTasks.filter((t) => t.status === 'DONE').length;
                 const isSelected = selectedUserId === u.id;
                 const isSelf = u.id === currentUser.id;
 
@@ -457,7 +569,7 @@ export default function TeamViewTab({
                           )}
                         </div>
                         <div className="text-[10px] text-slate-500">
-                          {uDone}/{uTasks.length} completed
+                          {uDayDone}/{uDayTasks.length} completed
                         </div>
                       </div>
                     </div>
@@ -492,6 +604,7 @@ export default function TeamViewTab({
         userName={selectedUser?.name}
         users={activeUsers}
         editingTask={editingTask}
+        targetDate={selectedDate}
       />
 
       {/* Monthly Report Modal */}
