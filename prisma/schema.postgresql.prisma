@@ -129,6 +129,8 @@ model AppConfig {
   saturdayShiftEndTime  String   @default("13.30") // Saturday
   autoSendMorningReport Boolean  @default(false)
   autoSendDailyLog      Boolean  @default(false)
+  telegramChatId        String   @default("")
+  telegramNotificationsEnabled Boolean @default(false)
   defaultUserId         String?
   updatedAt             DateTime @updatedAt
 }

@@ -1,6 +1,13 @@
 import nodemailer from 'nodemailer';
 import { prisma } from './prisma';
-import { getDayBounds, getLocalTimeDot, formatTo24HrDot, getLocalDateParts } from './time-utils';
+import {
+  getDayBounds,
+  getLocalTimeDot,
+  formatTo24HrDot,
+  getLocalDateParts,
+  formatLocalDate,
+} from './time-utils';
+import { notifyTaskLogSuccess, notifyTaskLogError } from './telegram';
 
 /**
  * Normalizes recipient list string for accurate comparison
@@ -649,6 +656,7 @@ export async function sendEveningSummaryEmail(
   targetUserId?: string,
   customCheckOutTime?: string
 ) {
+  let targetUser: any = null;
   try {
     const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
     if (!config) throw new Error('Settings not configured.');
@@ -659,10 +667,9 @@ export async function sendEveningSummaryEmail(
       throw new Error('No recipient email address configured.');
     }
 
-    const { startOfDay: todayStart, endOfDay: todayEnd } = getDayBounds(targetDate);
+    const { startOfDay: todayStart, endOfDay: todayEnd, formattedLong } = getDayBounds(targetDate);
 
     // Resolve targetUser: explicitly passed userId, or primary Lead/Admin
-    let targetUser = null;
     if (targetUserId) {
       targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
     }
@@ -872,11 +879,35 @@ export async function sendEveningSummaryEmail(
       finalToList.join(', ')
     );
 
+    const completedTasksCount = tasks.filter((t: any) => t.status === 'DONE').length;
+    const pendingTasksCount = tasks.length - completedTasksCount;
+
+    // Trigger Telegram delivery success alert (non-blocking)
+    notifyTaskLogSuccess({
+      userName: targetUser.name,
+      dateStr: formattedLong,
+      checkOutTime: finalShiftEnd,
+      totalCount: tasks.length,
+      completedCount: completedTasksCount,
+      pendingCount: pendingTasksCount,
+      toRecipients: finalToList.join(', '),
+      messageId: info.messageId,
+    }).catch((err) => console.error('[Telegram] notifyTaskLogSuccess error:', err));
+
     return {
       success: true,
       message: `Task Log summary email sent to ${finalToList.join(', ')} (Message ID: ${info.messageId})`,
     };
   } catch (error: any) {
+    console.error('[Mailer] sendEveningSummaryEmail error:', error);
+
+    // Trigger Telegram failure / error alert (non-blocking)
+    notifyTaskLogError({
+      userName: targetUser?.name || 'Lead',
+      dateStr: formatLocalDate(targetDate, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }),
+      errorMessage: error.message || 'Failed to dispatch Task Log email.',
+    }).catch((err) => console.error('[Telegram] notifyTaskLogError error:', err));
+
     return { success: false, message: error.message || 'Failed to dispatch Task Log email.' };
   }
 }

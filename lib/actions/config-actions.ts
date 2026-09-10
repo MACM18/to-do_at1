@@ -34,6 +34,8 @@ export async function getConfig() {
       saturdayShiftEndTime: '13.30',
       autoSendMorningReport: false,
       autoSendDailyLog: false,
+      telegramChatId: '',
+      telegramNotificationsEnabled: false,
     };
   }
 
@@ -64,6 +66,8 @@ export async function getConfig() {
         saturdayShiftEndTime: '13.30',
         autoSendMorningReport: false,
         autoSendDailyLog: false,
+        telegramChatId: '',
+        telegramNotificationsEnabled: false,
       },
     });
   }
@@ -91,6 +95,8 @@ export async function updateConfig(data: {
   saturdayShiftEndTime?: string;
   autoSendMorningReport?: boolean;
   autoSendDailyLog?: boolean;
+  telegramChatId?: string;
+  telegramNotificationsEnabled?: boolean;
   defaultUserId?: string;
 }) {
   const updatePayload: any = {};
@@ -129,6 +135,10 @@ export async function updateConfig(data: {
     updatePayload.autoSendMorningReport = Boolean(data.autoSendMorningReport);
   if (data.autoSendDailyLog !== undefined)
     updatePayload.autoSendDailyLog = Boolean(data.autoSendDailyLog);
+  if (data.telegramChatId !== undefined)
+    updatePayload.telegramChatId = data.telegramChatId.trim();
+  if (data.telegramNotificationsEnabled !== undefined)
+    updatePayload.telegramNotificationsEnabled = Boolean(data.telegramNotificationsEnabled);
   if (data.defaultUserId !== undefined) updatePayload.defaultUserId = data.defaultUserId;
 
   const config = await prisma.appConfig.upsert({
@@ -144,6 +154,24 @@ export async function updateConfig(data: {
 
   revalidatePath('/');
   return config;
+}
+
+export async function getTelegramStatusAction() {
+  const hasBotToken = Boolean(process.env.TELEGRAM_BOT_TOKEN?.trim());
+  return { hasBotToken };
+}
+
+export async function testTelegramAction(customChatId?: string) {
+  let targetChatId = customChatId?.trim();
+  if (!targetChatId) {
+    const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
+    targetChatId = config?.telegramChatId?.trim();
+  }
+  if (!targetChatId) {
+    return { success: false, error: 'Please enter a Telegram Chat ID first.' };
+  }
+  const { testTelegramConnection } = await import('../telegram');
+  return testTelegramConnection(targetChatId);
 }
 
 export async function testSmtpConnectionAction(customConfig?: {

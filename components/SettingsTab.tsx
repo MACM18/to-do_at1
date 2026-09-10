@@ -32,6 +32,8 @@ import {
   sendTestEmailAction,
   triggerMorningReportAction,
   triggerEveningSummaryAction,
+  getTelegramStatusAction,
+  testTelegramAction,
 } from "@/lib/actions/config-actions";
 import { deleteUser, updateUserPassword } from "@/lib/actions/user-actions";
 import { formatTo24HrDot } from "@/lib/time-utils";
@@ -52,6 +54,7 @@ export default function SettingsTab({
   const [activeAction, setActiveAction] = useState<
     | "saveConfig"
     | "testEmail"
+    | "testTelegram"
     | "forceMorning"
     | "forceEvening"
     | "changePassword"
@@ -119,6 +122,23 @@ export default function SettingsTab({
     Boolean(initialConfig?.autoSendDailyLog),
   );
 
+  // Telegram Notifications State
+  const [telegramChatId, setTelegramChatId] = useState(
+    initialConfig?.telegramChatId || "",
+  );
+  const [telegramNotificationsEnabled, setTelegramNotificationsEnabled] =
+    useState(Boolean(initialConfig?.telegramNotificationsEnabled));
+  const [hasTelegramBotToken, setHasTelegramBotToken] = useState<
+    boolean | null
+  >(null);
+  const [showTelegramHelp, setShowTelegramHelp] = useState(false);
+
+  React.useEffect(() => {
+    getTelegramStatusAction()
+      .then((res) => setHasTelegramBotToken(res.hasBotToken))
+      .catch(() => setHasTelegramBotToken(false));
+  }, []);
+
   const [showPassword, setShowPassword] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [testEmailAddress, setTestEmailAddress] = useState("");
@@ -137,10 +157,47 @@ export default function SettingsTab({
 
   const isAdmin = currentUser?.role === "ADMIN" || currentUser?.role === "LEAD";
 
+  // Test Telegram Action
+  const handleTestTelegram = () => {
+    if (!telegramChatId.trim()) {
+      setStatusMessage({
+        type: "error",
+        text: "Please enter a Telegram Chat ID before testing.",
+      });
+      return;
+    }
+    setActiveAction("testTelegram");
+    setStatusMessage(null);
+    startTransition(async () => {
+      try {
+        const res = await testTelegramAction(telegramChatId.trim());
+        if (res.success) {
+          setStatusMessage({
+            type: "success",
+            text: "Telegram test message delivered successfully! Check your chat.",
+          });
+        } else {
+          setStatusMessage({
+            type: "error",
+            text: res.error || "Failed to send Telegram test message.",
+          });
+        }
+      } catch (err: any) {
+        setStatusMessage({
+          type: "error",
+          text: err.message || "An error occurred while contacting Telegram.",
+        });
+      } finally {
+        setActiveAction(null);
+      }
+    });
+  };
+
   // Save Config
   const handleSaveConfig = (e: React.FormEvent) => {
     e.preventDefault();
     setStatusMessage(null);
+    setActiveAction("saveConfig");
 
     startTransition(async () => {
       try {
@@ -162,6 +219,8 @@ export default function SettingsTab({
           shiftEndTime,
           saturdayShiftEndTime,
           autoSendDailyLog,
+          telegramChatId,
+          telegramNotificationsEnabled,
         };
 
         if (isEditingPassword && smtpPassword.trim()) {
@@ -177,13 +236,15 @@ export default function SettingsTab({
         }
         setStatusMessage({
           type: "success",
-          text: "Settings, shift timings, and To/CC/BCC recipients saved successfully.",
+          text: "Settings, shift timings, and Telegram notification preferences saved successfully.",
         });
-      } catch (err: any) {
+      } catch (error: any) {
         setStatusMessage({
           type: "error",
-          text: err.message || "Failed to save settings",
+          text: error.message || "Failed to save configuration.",
         });
+      } finally {
+        setActiveAction(null);
       }
     });
   };
@@ -779,6 +840,120 @@ export default function SettingsTab({
                     placeholder="13.30"
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100"
                   />
+                </div>
+              </div>
+            </div>
+
+            {/* Telegram Notifications & Status Checker */}
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400">
+                    <Send className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                        Telegram Notifications &amp; Status Checker
+                      </h3>
+                      {hasTelegramBotToken === true && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Bot Token Configured
+                        </span>
+                      )}
+                      {hasTelegramBotToken === false && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> TELEGRAM_BOT_TOKEN missing in .env
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Receive real-time Telegram alerts on Task Log delivery success &amp; system errors.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowTelegramHelp(!showTelegramHelp)}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold self-start sm:self-auto"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  {showTelegramHelp ? "Hide Setup Guide" : "Setup Guide"}
+                </button>
+              </div>
+
+              {/* Setup Guide Accordion */}
+              {showTelegramHelp && (
+                <div className="p-4 rounded-2xl bg-sky-50/60 dark:bg-sky-950/40 border border-sky-100 dark:border-sky-900/50 text-xs text-slate-700 dark:text-slate-300 space-y-2 animate-in fade-in duration-150">
+                  <p className="font-bold text-sky-900 dark:text-sky-300">How to link your Telegram Bot:</p>
+                  <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                    <li>
+                      Open Telegram and message <strong>@BotFather</strong> to create a new bot and copy its API token.
+                    </li>
+                    <li>
+                      Add <code className="bg-slate-200/80 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono text-[10px]">TELEGRAM_BOT_TOKEN=&quot;your_token_here&quot;</code> into your <code className="font-mono text-[10px]">.env</code> file.
+                    </li>
+                    <li>
+                      Open your created bot in Telegram and click <strong>Start</strong> (or send <code className="font-mono text-[10px]">/start</code>).
+                    </li>
+                    <li>
+                      Find your numeric <strong>Chat ID</strong> by messaging <strong>@userinfobot</strong> or <strong>@RawDataBot</strong>.
+                    </li>
+                    <li>
+                      Paste your Chat ID below, check &quot;Enable Telegram Delivery Alerts&quot;, and click <strong>Save Settings</strong>.
+                    </li>
+                  </ol>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                <div className="sm:col-span-5">
+                  <label className="flex items-center gap-2.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 cursor-pointer h-[58px]">
+                    <input
+                      type="checkbox"
+                      checked={telegramNotificationsEnabled}
+                      onChange={(e) => setTelegramNotificationsEnabled(e.target.checked)}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                    />
+                    <div>
+                      <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        Enable Telegram Delivery Alerts
+                      </div>
+                      <div className="text-[10px] text-slate-500">
+                        Alert on delivery success &amp; errors
+                      </div>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="sm:col-span-4">
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                    Telegram Chat ID
+                  </label>
+                  <input
+                    type="text"
+                    value={telegramChatId}
+                    onChange={(e) => setTelegramChatId(e.target.value)}
+                    placeholder="e.g. 123456789"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="sm:col-span-3">
+                  <button
+                    type="button"
+                    disabled={isPending || activeAction === 'testTelegram' || !telegramChatId.trim()}
+                    onClick={handleTestTelegram}
+                    className="w-full py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all shadow-xs disabled:opacity-50 flex items-center justify-center gap-1.5 active:scale-95"
+                  >
+                    {activeAction === 'testTelegram' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5" />
+                    )}
+                    <span>Test Telegram</span>
+                  </button>
                 </div>
               </div>
             </div>
