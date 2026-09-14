@@ -1,6 +1,36 @@
 import { prisma } from './prisma';
 
 /**
+ * Global alert deduplication cache across Next.js re-evaluations
+ */
+const globalTelegramLocks = (globalThis as any).__telegram_sent_locks__ || new Map<string, number>();
+(globalThis as any).__telegram_sent_locks__ = globalTelegramLocks;
+
+/**
+ * Checks and acquires a lock for an alert to prevent duplicate messages sent at the same time
+ */
+function acquireAlertLock(lockKey: string, ttlMs = 25000): boolean {
+  const now = Date.now();
+  const lastSent = globalTelegramLocks.get(lockKey);
+  if (lastSent && now - lastSent < ttlMs) {
+    console.log(`[Telegram] Skipping duplicate alert for lockKey: ${lockKey} (${now - lastSent}ms ago)`);
+    return false;
+  }
+  globalTelegramLocks.set(lockKey, now);
+
+  // Clean old keys if map gets large
+  if (globalTelegramLocks.size > 50) {
+    for (const [k, v] of globalTelegramLocks.entries()) {
+      if (now - v > ttlMs * 2) {
+        globalTelegramLocks.delete(k);
+      }
+    }
+  }
+
+  return true;
+}
+
+/**
  * Escapes HTML characters for Telegram HTML parse mode
  */
 function escapeHtml(text: string): string {
@@ -67,7 +97,63 @@ export async function sendTelegramMessage(
 }
 
 /**
- * Sends a Task Log delivery success status notification
+ * Sends a Day Plan (morning) delivery success status notification
+ */
+export async function notifyDayPlanSuccess(details: {
+  userName: string;
+  dateStr: string;
+  checkInTime?: string;
+  plannedTasksCount: number;
+  meetingsCount?: number;
+  toRecipients: string;
+  messageId?: string;
+}) {
+  try {
+    const config = await prisma.appConfig.findUnique({
+      where: { id: 'global_config' },
+    });
+
+    if (!config?.telegramNotificationsEnabled || !config?.telegramChatId?.trim()) {
+      return;
+    }
+
+    const lockKey = `DAY_PLAN_${details.userName}_${details.dateStr}_${details.messageId || 'default'}`;
+    if (!acquireAlertLock(lockKey)) return;
+
+    const safeUser = escapeHtml(details.userName || 'Lead');
+    const safeDate = escapeHtml(details.dateStr || 'Today');
+    const safeCheckIn = escapeHtml(details.checkInTime || '08.30');
+    const safeTo = escapeHtml(details.toRecipients || 'Configured Recipients');
+    const safeMsgId = details.messageId ? escapeHtml(details.messageId) : null;
+    const meetingsText =
+      typeof details.meetingsCount === 'number' && details.meetingsCount > 0
+        ? `🤝 <b>Meetings:</b> ${details.meetingsCount} Scheduled`
+        : null;
+
+    const text = [
+      '🌅 <b>Day Plan Delivered Successfully</b>',
+      '━━━━━━━━━━━━━━━━━━━━',
+      `👤 <b>User:</b> ${safeUser}`,
+      `📅 <b>Date:</b> ${safeDate}`,
+      `🕒 <b>Check-in:</b> ${safeCheckIn}`,
+      `📋 <b>Planned Tasks:</b> ${details.plannedTasksCount} Planned`,
+      meetingsText,
+      `📬 <b>To:</b> ${safeTo}`,
+      safeMsgId ? `🆔 <b>Message ID:</b> <code>${safeMsgId}</code>` : '',
+      '━━━━━━━━━━━━━━━━━━━━',
+      '🚀 <i>System Status: Operational</i>',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    await sendTelegramMessage(config.telegramChatId, text);
+  } catch (err) {
+    console.error('[Telegram] Error triggering day plan success notification:', err);
+  }
+}
+
+/**
+ * Sends a Task Log (evening) delivery success status notification
  */
 export async function notifyTaskLogSuccess(details: {
   userName: string;
@@ -88,6 +174,9 @@ export async function notifyTaskLogSuccess(details: {
       return;
     }
 
+    const lockKey = `TASK_LOG_${details.userName}_${details.dateStr}_${details.messageId || 'default'}`;
+    if (!acquireAlertLock(lockKey)) return;
+
     const rate =
       details.totalCount > 0
         ? Math.round((details.completedCount / details.totalCount) * 100)
@@ -102,7 +191,7 @@ export async function notifyTaskLogSuccess(details: {
     const safeMsgId = details.messageId ? escapeHtml(details.messageId) : null;
 
     const text = [
-      '✅ <b>Task Log Delivered Successfully</b>',
+      '🌙 <b>Task Log Delivered Successfully</b>',
       '━━━━━━━━━━━━━━━━━━━━',
       `👤 <b>User:</b> ${safeUser}`,
       `📅 <b>Date:</b> ${safeDate}`,
@@ -119,14 +208,15 @@ export async function notifyTaskLogSuccess(details: {
 
     await sendTelegramMessage(config.telegramChatId, text);
   } catch (err) {
-    console.error('[Telegram] Error triggering success notification:', err);
+    console.error('[Telegram] Error triggering task log success notification:', err);
   }
 }
 
 /**
- * Sends an urgent Task Log failure / error notification (System Status Checker alert)
+ * Sends an urgent email delivery failure / error notification (System Status Checker alert)
  */
-export async function notifyTaskLogError(details: {
+export async function notifyEmailDeliveryError(details: {
+  type: 'MORNING_PLAN' | 'EVENING_TASKLOG' | string;
   userName?: string;
   dateStr?: string;
   errorMessage: string;
@@ -141,13 +231,17 @@ export async function notifyTaskLogError(details: {
       return;
     }
 
+    const lockKey = `ERR_${details.type}_${details.userName}_${details.dateStr}_${details.errorMessage}`;
+    if (!acquireAlertLock(lockKey)) return;
+
+    const typeTitle = details.type === 'MORNING_PLAN' ? 'Day Plan' : 'Task Log';
     const safeUser = escapeHtml(details.userName || 'Lead');
     const safeDate = escapeHtml(details.dateStr || 'Today');
     const safeError = escapeHtml(details.errorMessage || 'Unknown dispatch error.');
     const safeTo = details.toRecipients ? escapeHtml(details.toRecipients) : null;
 
     const text = [
-      '🚨 <b>Task Log Delivery Failed!</b>',
+      `🚨 <b>${typeTitle} Delivery Failed!</b>`,
       '━━━━━━━━━━━━━━━━━━━━',
       `👤 <b>User:</b> ${safeUser}`,
       `📅 <b>Date:</b> ${safeDate}`,
@@ -165,6 +259,14 @@ export async function notifyTaskLogError(details: {
   }
 }
 
+// Backward compatibility alias
+export const notifyTaskLogError = (details: {
+  userName?: string;
+  dateStr?: string;
+  errorMessage: string;
+  toRecipients?: string;
+}) => notifyEmailDeliveryError({ ...details, type: 'EVENING_TASKLOG' });
+
 /**
  * Sends a test notification to verify Telegram Bot connectivity
  */
@@ -173,7 +275,7 @@ export async function testTelegramConnection(chatId: string) {
     '🤖 <b>Telegram Notification Test</b>',
     '━━━━━━━━━━━━━━━━━━━━',
     '✅ <b>Connection Status:</b> Operational',
-    'Your Telegram bot is successfully connected and will alert you upon Task Log deliveries and system errors.',
+    'Your Telegram bot is successfully connected and will alert you upon Day Plan & Task Log deliveries and system errors.',
     '━━━━━━━━━━━━━━━━━━━━',
     `🕒 <i>Timestamp: ${new Date().toISOString()}</i>`,
   ].join('\n');

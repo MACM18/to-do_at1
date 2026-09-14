@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '../prisma';
-import { getDayBounds, formatTo24HrDot } from '../time-utils';
+import { getDayBounds, formatTo24HrDot, formatLocalDate } from '../time-utils';
 import {
   getTransporter,
   resolveRecipients,
@@ -10,6 +10,11 @@ import {
   saveMonthlyThreadMessage,
   buildReportTableHtml,
 } from '../mailer';
+import {
+  notifyDayPlanSuccess,
+  notifyTaskLogSuccess,
+  notifyEmailDeliveryError,
+} from '../telegram';
 
 /**
  * Automatically prunes email draft records older than 30 days
@@ -330,6 +335,7 @@ export async function sendEmailDraftNow(data: {
   checkInTime?: string;
   checkOutTime?: string;
 }) {
+  let targetUser: any = null;
   try {
     await pruneOldEmailDrafts();
 
@@ -342,7 +348,7 @@ export async function sendEmailDraftNow(data: {
     }
 
     const targetDate = data.date ? new Date(data.date) : new Date();
-    const { startOfDay: todayStart, endOfDay: todayEnd, dayOfWeek } = getDayBounds(targetDate);
+    const { startOfDay: todayStart, endOfDay: todayEnd, dayOfWeek, formattedLong } = getDayBounds(targetDate);
     const isSaturday = dayOfWeek === 6;
 
     const toList = data.toRecipients
@@ -362,7 +368,7 @@ export async function sendEmailDraftNow(data: {
       ? data.bccRecipients.split(',').map((r) => r.trim()).filter(Boolean)
       : [];
 
-    const targetUser = await prisma.user.findUnique({
+    targetUser = await prisma.user.findUnique({
       where: { id: data.userId },
     });
 
@@ -492,6 +498,61 @@ export async function sendEmailDraftNow(data: {
       },
     });
 
+    // Trigger Telegram notification based on email type (non-blocking)
+    if (data.type === 'MORNING_PLAN') {
+      const tasksCount = await prisma.task.count({
+        where: {
+          userId: targetUser.id,
+          OR: [
+            { status: { in: ['TODO', 'IN_PROGRESS'] } },
+            { recurrence: { in: ['DAILY', 'WEEKLY'] } },
+            { createdAt: { gte: todayStart } },
+          ],
+        },
+      });
+      const meetingsCount = await prisma.meetingLog.count({
+        where: {
+          userId: targetUser.id,
+          date: { gte: todayStart, lte: todayEnd },
+        },
+      });
+
+      notifyDayPlanSuccess({
+        userName: targetUser.name,
+        dateStr: formattedLong,
+        checkInTime: data.checkInTime ? formatTo24HrDot(data.checkInTime) : formatTo24HrDot(config?.shiftStartTime || '08.30'),
+        plannedTasksCount: tasksCount,
+        meetingsCount: meetingsCount,
+        toRecipients: toList.join(', '),
+        messageId: info.messageId,
+      }).catch((err: any) => console.error('[Telegram] notifyDayPlanSuccess error:', err));
+    } else {
+      const dailyTasks = await prisma.task.findMany({
+        where: {
+          userId: targetUser.id,
+          OR: [
+            { status: { in: ['TODO', 'IN_PROGRESS'] } },
+            { recurrence: { in: ['DAILY', 'WEEKLY'] } },
+            { createdAt: { gte: todayStart, lte: todayEnd } },
+            { updatedAt: { gte: todayStart, lte: todayEnd } },
+          ],
+        },
+      });
+      const completedTasksCount = dailyTasks.filter((t) => t.status === 'DONE').length;
+      const pendingTasksCount = dailyTasks.length - completedTasksCount;
+
+      notifyTaskLogSuccess({
+        userName: targetUser.name,
+        dateStr: formattedLong,
+        checkOutTime: data.checkOutTime ? formatTo24HrDot(data.checkOutTime) : formatTo24HrDot(config?.shiftEndTime || '17.30'),
+        totalCount: dailyTasks.length,
+        completedCount: completedTasksCount,
+        pendingCount: pendingTasksCount,
+        toRecipients: toList.join(', '),
+        messageId: info.messageId,
+      }).catch((err: any) => console.error('[Telegram] notifyTaskLogSuccess error:', err));
+    }
+
     revalidatePath('/');
     return {
       success: true,
@@ -499,6 +560,16 @@ export async function sendEmailDraftNow(data: {
     };
   } catch (error: any) {
     console.error('Error sending email draft:', error);
+
+    // Trigger Telegram failure alert (non-blocking)
+    notifyEmailDeliveryError({
+      type: data.type,
+      userName: targetUser?.name || 'Lead',
+      dateStr: formatLocalDate(data.date ? new Date(data.date) : new Date(), { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }),
+      errorMessage: error.message || 'Failed to dispatch email.',
+      toRecipients: data.toRecipients,
+    }).catch((err: any) => console.error('[Telegram] notifyEmailDeliveryError error:', err));
+
     return {
       success: false,
       message: error.message || 'Failed to dispatch email.',

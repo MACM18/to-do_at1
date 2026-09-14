@@ -3,11 +3,25 @@ import { prisma } from './prisma';
 import { sendDailySummaryReport } from './mailer';
 import { processRecurringTasks } from './recurrence';
 
-let eveningWeekdayTask: cron.ScheduledTask | null = null;
-let eveningSaturdayTask: cron.ScheduledTask | null = null;
-let recurrenceMidnightTask: cron.ScheduledTask | null = null;
-
 const SCHEDULER_TIMEZONE = 'Asia/Colombo'; // UTC+05:30
+
+/**
+ * Singleton scheduler task store attached to globalThis
+ * Prevents multiple instances across Next.js re-evaluations
+ */
+interface SchedulerTasks {
+  eveningWeekdayTask: cron.ScheduledTask | null;
+  eveningSaturdayTask: cron.ScheduledTask | null;
+  recurrenceMidnightTask: cron.ScheduledTask | null;
+}
+
+const globalScheduler: SchedulerTasks =
+  (globalThis as any).__scheduler_tasks__ || {
+    eveningWeekdayTask: null,
+    eveningSaturdayTask: null,
+    recurrenceMidnightTask: null,
+  };
+(globalThis as any).__scheduler_tasks__ = globalScheduler;
 
 /**
  * Initializes and schedules background cron jobs based on working schedule:
@@ -23,22 +37,22 @@ export async function initScheduler() {
     const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
     if (!config) return;
 
-    // Stop existing scheduled tasks
-    if (eveningWeekdayTask) {
-      eveningWeekdayTask.stop();
-      eveningWeekdayTask = null;
+    // Stop existing scheduled tasks cleanly
+    if (globalScheduler.eveningWeekdayTask) {
+      globalScheduler.eveningWeekdayTask.stop();
+      globalScheduler.eveningWeekdayTask = null;
     }
-    if (eveningSaturdayTask) {
-      eveningSaturdayTask.stop();
-      eveningSaturdayTask = null;
+    if (globalScheduler.eveningSaturdayTask) {
+      globalScheduler.eveningSaturdayTask.stop();
+      globalScheduler.eveningSaturdayTask = null;
     }
-    if (recurrenceMidnightTask) {
-      recurrenceMidnightTask.stop();
-      recurrenceMidnightTask = null;
+    if (globalScheduler.recurrenceMidnightTask) {
+      globalScheduler.recurrenceMidnightTask.stop();
+      globalScheduler.recurrenceMidnightTask = null;
     }
 
     // Schedule 1: Midnight Recurring Task Roll-Over (Mon - Sat at 00:01)
-    recurrenceMidnightTask = cron.schedule(
+    globalScheduler.recurrenceMidnightTask = cron.schedule(
       '1 0 * * 1-6',
       async () => {
         console.log('[Cron] Running midnight recurring task processor (Mon-Sat)...');
@@ -58,8 +72,7 @@ export async function initScheduler() {
       Boolean(config.ccRecipients) ||
       Boolean(config.bccRecipients);
 
-    // Schedule 2: Automated Evening Task Log (Mon-Fri at 17:30, Sat at 13:30)
-    // Morning Day Plan is strictly manual-only upon user confirmation.
+    // Schedule 2: Automated Evening Task Log (Mon-Fri at configured time, Sat at saturdayReportTime)
     if (config.autoSendDailyLog && config.smtpUser && hasRecipients) {
       // 2A: Weekday Evening Log (Monday to Friday, e.g. 17:30 or 18:00)
       const eveningTime = config.eveningReportTime || '17:30';
@@ -72,7 +85,7 @@ export async function initScheduler() {
         `[Cron] Scheduling Weekday Task Log (Mon-Fri) at ${eveningTime} +05:30 (${weekdayCronExpr})`
       );
 
-      eveningWeekdayTask = cron.schedule(
+      globalScheduler.eveningWeekdayTask = cron.schedule(
         weekdayCronExpr,
         async () => {
           console.log('[Cron] Triggering scheduled weekday evening summary (Mon-Fri)...');
@@ -97,7 +110,7 @@ export async function initScheduler() {
         `[Cron] Scheduling Saturday Task Log at ${saturdayTime} +05:30 (${saturdayCronExpr})`
       );
 
-      eveningSaturdayTask = cron.schedule(
+      globalScheduler.eveningSaturdayTask = cron.schedule(
         saturdayCronExpr,
         async () => {
           console.log(`[Cron] Triggering scheduled Saturday task log at ${saturdayTime}...`);

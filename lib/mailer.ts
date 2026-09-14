@@ -7,7 +7,12 @@ import {
   getLocalDateParts,
   formatLocalDate,
 } from './time-utils';
-import { notifyTaskLogSuccess, notifyTaskLogError } from './telegram';
+import {
+  notifyDayPlanSuccess,
+  notifyTaskLogSuccess,
+  notifyEmailDeliveryError,
+  notifyTaskLogError,
+} from './telegram';
 
 /**
  * Normalizes recipient list string for accurate comparison
@@ -476,6 +481,7 @@ export async function sendTestEmail(targetEmail: string) {
  * Sends Morning "Day Plan" Email
  */
 export async function sendMorningReportEmail(userId?: string, customCheckInTime?: string) {
+  let targetUser: any = null;
   try {
     const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
     if (!config) throw new Error('Settings not configured.');
@@ -486,7 +492,6 @@ export async function sendMorningReportEmail(userId?: string, customCheckInTime?
       throw new Error('No recipient email address found in settings.');
     }
 
-    let targetUser = null;
     if (userId) {
       targetUser = await prisma.user.findUnique({ where: { id: userId } });
     }
@@ -507,7 +512,7 @@ export async function sendMorningReportEmail(userId?: string, customCheckInTime?
       throw new Error('No active user found to send report for.');
     }
 
-    const { startOfDay: todayStart, endOfDay: todayEnd } = getDayBounds(new Date());
+    const { startOfDay: todayStart, endOfDay: todayEnd, formattedLong } = getDayBounds(new Date());
 
     if (customCheckInTime && customCheckInTime.trim()) {
       const existing = await prisma.dailyShift.findFirst({
@@ -639,11 +644,38 @@ export async function sendMorningReportEmail(userId?: string, customCheckInTime?
       finalToList.join(', ')
     );
 
+    const effectiveCheckIn = shift?.shiftStartTime
+      ? formatTo24HrDot(shift.shiftStartTime)
+      : customCheckInTime
+      ? formatTo24HrDot(customCheckInTime)
+      : formatTo24HrDot(config?.shiftStartTime || '08.30');
+
+    // Trigger Telegram Day Plan delivery success alert (non-blocking)
+    notifyDayPlanSuccess({
+      userName: targetUser.name,
+      dateStr: formattedLong,
+      checkInTime: effectiveCheckIn,
+      plannedTasksCount: tasks.length,
+      meetingsCount: meetings?.length || 0,
+      toRecipients: finalToList.join(', '),
+      messageId: info.messageId,
+    }).catch((err: any) => console.error('[Telegram] notifyDayPlanSuccess error:', err));
+
     return {
       success: true,
       message: `Day Plan email sent to ${finalToList.join(', ')} (Message ID: ${info.messageId})`,
     };
   } catch (error: any) {
+    console.error('[Mailer] sendMorningReportEmail error:', error);
+
+    // Trigger Telegram Day Plan failure alert (non-blocking)
+    notifyEmailDeliveryError({
+      type: 'MORNING_PLAN',
+      userName: targetUser?.name || 'Lead',
+      dateStr: formatLocalDate(new Date(), { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }),
+      errorMessage: error.message || 'Failed to dispatch Day Plan email.',
+    }).catch((err: any) => console.error('[Telegram] notifyEmailDeliveryError error:', err));
+
     return { success: false, message: error.message || 'Failed to dispatch Day Plan email.' };
   }
 }
@@ -892,7 +924,7 @@ export async function sendEveningSummaryEmail(
       pendingCount: pendingTasksCount,
       toRecipients: finalToList.join(', '),
       messageId: info.messageId,
-    }).catch((err) => console.error('[Telegram] notifyTaskLogSuccess error:', err));
+    }).catch((err: any) => console.error('[Telegram] notifyTaskLogSuccess error:', err));
 
     return {
       success: true,
@@ -906,7 +938,7 @@ export async function sendEveningSummaryEmail(
       userName: targetUser?.name || 'Lead',
       dateStr: formatLocalDate(targetDate, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }),
       errorMessage: error.message || 'Failed to dispatch Task Log email.',
-    }).catch((err) => console.error('[Telegram] notifyTaskLogError error:', err));
+    }).catch((err: any) => console.error('[Telegram] notifyTaskLogError error:', err));
 
     return { success: false, message: error.message || 'Failed to dispatch Task Log email.' };
   }
