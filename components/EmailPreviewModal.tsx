@@ -271,23 +271,23 @@ export default function EmailPreviewModal({
         {/* Status Toast Alert */}
         {statusMessage && (
           <div
-            className={`px-6 py-2.5 text-xs font-semibold flex items-center justify-between gap-2.5 shrink-0 animate-in fade-in duration-150 ${
+            className={`px-6 py-2.5 text-xs font-semibold flex items-start justify-between gap-2.5 shrink-0 animate-in fade-in duration-150 ${
               statusMessage.type === 'success'
                 ? 'bg-emerald-50 text-emerald-800 border-b border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-900/50'
                 : 'bg-rose-50 text-rose-800 border-b border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-900/50'
             }`}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-start gap-2">
               {statusMessage.type === 'success' ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
               ) : (
-                <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
               )}
-              <span>{statusMessage.text}</span>
+              <span className="leading-relaxed whitespace-pre-wrap">{statusMessage.text}</span>
             </div>
             <button
               onClick={() => setStatusMessage(null)}
-              className="text-[11px] opacity-70 hover:opacity-100"
+              className="text-[11px] opacity-70 hover:opacity-100 shrink-0"
             >
               Dismiss
             </button>

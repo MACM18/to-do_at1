@@ -412,17 +412,17 @@ export default function SettingsTab({
               : "bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/50"
           }`}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2.5">
             {statusMessage.type === "success" ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
             ) : (
-              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
             )}
-            <span>{statusMessage.text}</span>
+            <span className="leading-relaxed whitespace-pre-wrap">{statusMessage.text}</span>
           </div>
           <button
             onClick={() => setStatusMessage(null)}
-            className="text-xs opacity-70 hover:opacity-100"
+            className="text-xs opacity-70 hover:opacity-100 shrink-0"
           >
             Dismiss
           </button>
@@ -540,6 +540,41 @@ export default function SettingsTab({
                     <span>SSL / Secure</span>
                   </label>
                 </div>
+                {/* Port Preset Quick Selectors */}
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-[10px] text-slate-400 font-medium">Quick Presets:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSmtpPort(465);
+                      setSmtpSecure(true);
+                    }}
+                    className={`text-[10px] px-2 py-0.5 rounded-lg border font-semibold transition-all ${
+                      Number(smtpPort) === 465 && smtpSecure
+                        ? "bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950 dark:border-blue-800 dark:text-blue-300"
+                        : "border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    Port 465 (SSL)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSmtpPort(587);
+                      setSmtpSecure(false);
+                    }}
+                    className={`text-[10px] px-2 py-0.5 rounded-lg border font-semibold transition-all ${
+                      Number(smtpPort) === 587 && !smtpSecure
+                        ? "bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950 dark:border-blue-800 dark:text-blue-300"
+                        : "border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    Port 587 (STARTTLS)
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                  💡 If facing connection timeouts (<code>ETIMEDOUT</code>), switch to <strong>Port 587 (STARTTLS)</strong>. Many ISP and cloud networks block port 465.
+                </p>
               </div>
 
               <div>

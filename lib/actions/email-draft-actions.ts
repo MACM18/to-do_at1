@@ -9,6 +9,7 @@ import {
   getMonthlyThreadDetails,
   saveMonthlyThreadMessage,
   buildReportTableHtml,
+  formatSmtpError,
 } from '../mailer';
 import {
   notifyDayPlanSuccess,
@@ -336,10 +337,11 @@ export async function sendEmailDraftNow(data: {
   checkOutTime?: string;
 }) {
   let targetUser: any = null;
+  let config: any = null;
   try {
     await pruneOldEmailDrafts();
 
-    const config = await prisma.appConfig.findUnique({
+    config = await prisma.appConfig.findUnique({
       where: { id: 'global_config' },
     });
 
@@ -559,20 +561,36 @@ export async function sendEmailDraftNow(data: {
       message: `${data.type === 'MORNING_PLAN' ? 'Day Plan' : 'Task Log'} email dispatched successfully to ${toList.join(', ')}`,
     };
   } catch (error: any) {
-    console.error('Error sending email draft:', error);
+    const formatted = formatSmtpError(error, {
+      host: config?.smtpHost,
+      port: Number(config?.smtpPort) || 465,
+      secure: config?.smtpSecure ?? (Number(config?.smtpPort) === 465),
+    });
+
+    console.error('[SMTP Diagnostics - Draft Send Error]', {
+      type: data.type,
+      user: targetUser?.name || data.userId,
+      host: config?.smtpHost,
+      port: config?.smtpPort,
+      secure: config?.smtpSecure,
+      code: error?.code,
+      command: error?.command,
+      message: error?.message,
+      troubleshooting: formatted.details.troubleshootingHint,
+    });
 
     // Trigger Telegram failure alert (non-blocking)
     notifyEmailDeliveryError({
       type: data.type,
       userName: targetUser?.name || 'Lead',
       dateStr: formatLocalDate(data.date ? new Date(data.date) : new Date(), { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }),
-      errorMessage: error.message || 'Failed to dispatch email.',
+      errorMessage: formatted.message,
       toRecipients: data.toRecipients,
     }).catch((err: any) => console.error('[Telegram] notifyEmailDeliveryError error:', err));
 
     return {
       success: false,
-      message: error.message || 'Failed to dispatch email.',
+      message: formatted.message,
     };
   }
 }

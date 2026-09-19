@@ -28,6 +28,94 @@ function normalizeRecipients(recipients?: string | null): string {
 }
 
 /**
+ * Formats SMTP error into actionable diagnostics for UI and logs
+ */
+export interface SmtpDiagnosticDetails {
+  host: string;
+  port: number;
+  secure: boolean;
+  code?: string;
+  command?: string;
+  response?: string;
+  responseCode?: number;
+  originalMessage: string;
+  friendlyMessage: string;
+  troubleshootingHint: string;
+}
+
+export function formatSmtpError(
+  error: any,
+  context?: { host?: string; port?: number; secure?: boolean }
+): {
+  message: string;
+  details: SmtpDiagnosticDetails;
+} {
+  const host = context?.host || 'smtp.gmail.com';
+  const port = context?.port || 465;
+  const secure = context?.secure ?? (port === 465);
+  const code = error?.code || 'UNKNOWN';
+  const command = error?.command || '';
+  const response = error?.response || '';
+  const responseCode = error?.responseCode;
+  const originalMessage = error?.message || 'Unknown SMTP error';
+
+  let friendlyMessage = originalMessage;
+  let troubleshootingHint = '';
+
+  if (
+    code === 'ETIMEDOUT' ||
+    originalMessage.includes('ETIMEDOUT') ||
+    originalMessage.includes('Connection timeout')
+  ) {
+    friendlyMessage = `Connection timeout connecting to ${host}:${port} (${command ? `during ${command}` : 'TCP socket'}).`;
+    troubleshootingHint =
+      port === 465
+        ? `Port 465 timed out. Many ISPs and cloud hosting networks block outbound port 465. In Settings, switch to Port 587 and uncheck SSL (Nodemailer uses STARTTLS).`
+        : `Port ${port} timed out. Try switching to Port 465 with SSL enabled in Settings, or verify outbound SMTP traffic is allowed on your network.`;
+  } else if (code === 'ECONNREFUSED' || originalMessage.includes('ECONNREFUSED')) {
+    friendlyMessage = `Connection refused by ${host}:${port}.`;
+    troubleshootingHint = `The server rejected the connection on port ${port}. Verify your SMTP host and port settings.`;
+  } else if (
+    code === 'EAUTH' ||
+    responseCode === 535 ||
+    originalMessage.includes('Invalid login') ||
+    originalMessage.includes('Username and Password not accepted')
+  ) {
+    friendlyMessage = `Authentication failed for ${host} (${responseCode || '535'}).`;
+    troubleshootingHint = `Gmail requires a 16-character App Password (not your normal Gmail password) and 2-Step Verification must be enabled on your Google account.`;
+  } else if (code === 'EENVELOPE') {
+    friendlyMessage = `Invalid recipient envelope: ${originalMessage}`;
+    troubleshootingHint = `Please verify recipient email addresses in Settings.`;
+  } else if (code === 'ESOCKET') {
+    friendlyMessage = `SSL/TLS socket error connecting to ${host}:${port}.`;
+    troubleshootingHint =
+      port === 587 && secure
+        ? `Port 587 does not use direct SSL. Uncheck "SSL / Secure" in Settings so STARTTLS can be negotiated.`
+        : `Check your Port & SSL configuration in Settings.`;
+  }
+
+  const message = troubleshootingHint
+    ? `${friendlyMessage} ${troubleshootingHint}`
+    : friendlyMessage;
+
+  return {
+    message,
+    details: {
+      host,
+      port,
+      secure,
+      code,
+      command,
+      response,
+      responseCode,
+      originalMessage,
+      friendlyMessage,
+      troubleshootingHint,
+    },
+  };
+}
+
+/**
  * Validates and initializes the Nodemailer SMTP Transporter
  */
 export async function getTransporter() {
@@ -56,9 +144,9 @@ export async function getTransporter() {
       user: config.smtpUser.trim(),
       pass: config.smtpPassword.replace(/\s+/g, ''),
     },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
+    connectionTimeout: 20000,
+    greetingTimeout: 20000,
+    socketTimeout: 30000,
   });
 
   return transporter;
@@ -413,6 +501,10 @@ export function buildReportTableHtml(options: {
  * Tests SMTP connection
  */
 export async function testSmtpConnection(customConfig?: any) {
+  let host = 'smtp.gmail.com';
+  let port = 465;
+  let isSecure = true;
+
   try {
     let transporter: nodemailer.Transporter;
 
@@ -423,28 +515,51 @@ export async function testSmtpConnection(customConfig?: any) {
         pass = saved?.smtpPassword || '';
       }
 
-      const port = Number(customConfig.smtpPort) || 465;
-      const isSecure = customConfig.smtpSecure ?? (port === 465);
+      host = customConfig.smtpHost.trim();
+      port = Number(customConfig.smtpPort) || 465;
+      isSecure = customConfig.smtpSecure ?? (port === 465);
+
       transporter = nodemailer.createTransport({
-        host: customConfig.smtpHost.trim(),
+        host: host,
         port: port,
         secure: isSecure,
         auth: {
           user: customConfig.smtpUser?.trim(),
           pass: pass.replace(/\s+/g, ''),
         },
-        connectionTimeout: 8000,
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+        socketTimeout: 20000,
       });
     } else {
       transporter = await getTransporter();
+      const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
+      if (config) {
+        host = config.smtpHost;
+        port = Number(config.smtpPort) || 465;
+        isSecure = config.smtpSecure ?? (port === 465);
+      }
     }
 
     await transporter.verify();
-    return { success: true, message: 'SMTP server connection verified successfully.' };
+    return {
+      success: true,
+      message: `SMTP server connection verified successfully (${host}:${port}, ${isSecure ? 'SSL' : 'STARTTLS'}).`,
+    };
   } catch (error: any) {
+    const formatted = formatSmtpError(error, { host, port, secure: isSecure });
+    console.error('[SMTP Diagnostics - Test Connection Error]', {
+      host,
+      port,
+      secure: isSecure,
+      code: error?.code,
+      command: error?.command,
+      message: error?.message,
+      troubleshooting: formatted.details.troubleshootingHint,
+    });
     return {
       success: false,
-      message: error.message || 'Failed to authenticate with SMTP server.',
+      message: formatted.message,
     };
   }
 }
@@ -453,9 +568,17 @@ export async function testSmtpConnection(customConfig?: any) {
  * Sends a test email
  */
 export async function sendTestEmail(targetEmail: string) {
+  let host = 'smtp.gmail.com';
+  let port = 465;
+  let isSecure = true;
+
   try {
     const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
     if (!config) throw new Error('Settings not configured.');
+
+    host = config.smtpHost;
+    port = Number(config.smtpPort) || 465;
+    isSecure = config.smtpSecure ?? (port === 465);
 
     const transporter = await getTransporter();
 
@@ -473,7 +596,17 @@ export async function sendTestEmail(targetEmail: string) {
 
     return { success: true, message: `Test email delivered to ${targetEmail} (ID: ${info.messageId})` };
   } catch (error: any) {
-    return { success: false, message: error.message || 'Failed to send test email.' };
+    const formatted = formatSmtpError(error, { host, port, secure: isSecure });
+    console.error('[SMTP Diagnostics - Test Email Error]', {
+      host,
+      port,
+      secure: isSecure,
+      code: error?.code,
+      command: error?.command,
+      message: error?.message,
+      troubleshooting: formatted.details.troubleshootingHint,
+    });
+    return { success: false, message: formatted.message };
   }
 }
 
@@ -666,17 +799,29 @@ export async function sendMorningReportEmail(userId?: string, customCheckInTime?
       message: `Day Plan email sent to ${finalToList.join(', ')} (Message ID: ${info.messageId})`,
     };
   } catch (error: any) {
-    console.error('[Mailer] sendMorningReportEmail error:', error);
+    const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
+    const formatted = formatSmtpError(error, {
+      host: config?.smtpHost,
+      port: Number(config?.smtpPort) || 465,
+      secure: config?.smtpSecure ?? (Number(config?.smtpPort) === 465),
+    });
+
+    console.error('[SMTP Diagnostics - Morning Report Error]', {
+      error: error.message,
+      code: error?.code,
+      command: error?.command,
+      troubleshooting: formatted.details.troubleshootingHint,
+    });
 
     // Trigger Telegram Day Plan failure alert (non-blocking)
     notifyEmailDeliveryError({
       type: 'MORNING_PLAN',
       userName: targetUser?.name || 'Lead',
       dateStr: formatLocalDate(new Date(), { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }),
-      errorMessage: error.message || 'Failed to dispatch Day Plan email.',
+      errorMessage: formatted.message,
     }).catch((err: any) => console.error('[Telegram] notifyEmailDeliveryError error:', err));
 
-    return { success: false, message: error.message || 'Failed to dispatch Day Plan email.' };
+    return { success: false, message: formatted.message };
   }
 }
 
@@ -931,16 +1076,28 @@ export async function sendEveningSummaryEmail(
       message: `Task Log summary email sent to ${finalToList.join(', ')} (Message ID: ${info.messageId})`,
     };
   } catch (error: any) {
-    console.error('[Mailer] sendEveningSummaryEmail error:', error);
+    const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
+    const formatted = formatSmtpError(error, {
+      host: config?.smtpHost,
+      port: Number(config?.smtpPort) || 465,
+      secure: config?.smtpSecure ?? (Number(config?.smtpPort) === 465),
+    });
+
+    console.error('[SMTP Diagnostics - Evening Summary Error]', {
+      error: error.message,
+      code: error?.code,
+      command: error?.command,
+      troubleshooting: formatted.details.troubleshootingHint,
+    });
 
     // Trigger Telegram failure / error alert (non-blocking)
     notifyTaskLogError({
       userName: targetUser?.name || 'Lead',
       dateStr: formatLocalDate(targetDate, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }),
-      errorMessage: error.message || 'Failed to dispatch Task Log email.',
+      errorMessage: formatted.message,
     }).catch((err: any) => console.error('[Telegram] notifyTaskLogError error:', err));
 
-    return { success: false, message: error.message || 'Failed to dispatch Task Log email.' };
+    return { success: false, message: formatted.message };
   }
 }
 
