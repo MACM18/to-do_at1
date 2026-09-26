@@ -129,6 +129,8 @@ model AppConfig {
   saturdayShiftEndTime  String   @default("13.30") // Saturday
   autoSendMorningReport Boolean  @default(false)
   autoSendDailyLog      Boolean  @default(false)
+  pausedEveningLogDate  String?  // Date string e.g. "2026-09-26" when evening log is paused (Holiday/Leave)
+  pausedEveningLogReason String? // e.g. "Holiday / Leave"
   telegramChatId        String   @default("")
   telegramNotificationsEnabled Boolean @default(false)
   defaultUserId         String?

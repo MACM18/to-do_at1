@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '../prisma';
-import { getDayBounds, formatTo24HrDot, formatLocalDate } from '../time-utils';
+import { getDayBounds, formatTo24HrDot, formatLocalDate, getLocalDateParts } from '../time-utils';
 import {
   getTransporter,
   resolveRecipients,
@@ -91,6 +91,10 @@ export async function getEmailDraftPreview(params: {
     toList.join(', ')
   );
 
+  const { dateStr } = getLocalDateParts(targetDate);
+  const isEvening = type === 'EVENING_TASKLOG';
+  const isPaused = isEvening && Boolean(config?.pausedEveningLogDate === dateStr || savedDraft?.status === 'PAUSED');
+
   if (savedDraft) {
     return {
       id: savedDraft.id,
@@ -115,6 +119,9 @@ export async function getEmailDraftPreview(params: {
       status: savedDraft.status,
       sentAt: savedDraft.sentAt ? savedDraft.sentAt.toISOString() : null,
       isCustomized: true,
+      isPaused,
+      pausedDate: config?.pausedEveningLogDate || null,
+      pausedReason: config?.pausedEveningLogReason || null,
     };
   }
 
@@ -209,6 +216,9 @@ export async function getEmailDraftPreview(params: {
     status: 'DRAFT',
     sentAt: null,
     isCustomized: false,
+    isPaused,
+    pausedDate: config?.pausedEveningLogDate || null,
+    pausedReason: config?.pausedEveningLogReason || null,
   };
 }
 
@@ -599,20 +609,28 @@ export async function sendEmailDraftNow(data: {
  * Gets draft review / status for today to show badges on buttons
  */
 export async function getTodayEmailDraftStatus(userId: string) {
-  const { startOfDay: todayStart, endOfDay: todayEnd } = getDayBounds(new Date());
+  const now = new Date();
+  const { startOfDay: todayStart, endOfDay: todayEnd } = getDayBounds(now);
+  const { dateStr: todayDateStr } = getLocalDateParts(now);
 
-  const drafts = await prisma.emailDraft.findMany({
-    where: {
-      userId,
-      date: {
-        gte: todayStart,
-        lte: todayEnd,
+  const [drafts, config] = await Promise.all([
+    prisma.emailDraft.findMany({
+      where: {
+        userId,
+        date: {
+          gte: todayStart,
+          lte: todayEnd,
+        },
       },
-    },
-  });
+    }),
+    prisma.appConfig.findUnique({ where: { id: 'global_config' } }),
+  ]);
 
   const morningDraft = drafts.find((d) => d.type === 'MORNING_PLAN');
   const eveningDraft = drafts.find((d) => d.type === 'EVENING_TASKLOG');
+  const isEveningPaused = Boolean(
+    config?.pausedEveningLogDate === todayDateStr || eveningDraft?.status === 'PAUSED'
+  );
 
   return {
     morning: {
@@ -623,6 +641,9 @@ export async function getTodayEmailDraftStatus(userId: string) {
     evening: {
       hasDraft: Boolean(eveningDraft),
       isSent: eveningDraft?.status === 'SENT',
+      isPaused: isEveningPaused,
+      pausedDate: config?.pausedEveningLogDate || null,
+      pausedReason: config?.pausedEveningLogReason || null,
       sentAt: eveningDraft?.sentAt ? eveningDraft.sentAt.toISOString() : null,
     },
   };

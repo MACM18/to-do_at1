@@ -23,6 +23,9 @@ import {
   Lock,
   KeyRound,
   ShieldAlert,
+  Coffee,
+  PauseCircle,
+  PlayCircle,
 } from "lucide-react";
 import UserModal from "./UserModal";
 import ConfirmDialog from "./ConfirmDialog";
@@ -34,9 +37,10 @@ import {
   triggerEveningSummaryAction,
   getTelegramStatusAction,
   testTelegramAction,
+  togglePauseEveningLogForTodayAction,
 } from "@/lib/actions/config-actions";
 import { deleteUser, updateUserPassword } from "@/lib/actions/user-actions";
-import { formatTo24HrDot } from "@/lib/time-utils";
+import { formatTo24HrDot, getLocalDateParts } from "@/lib/time-utils";
 
 interface SettingsTabProps {
   config: any;
@@ -121,6 +125,28 @@ export default function SettingsTab({
   const [autoSendDailyLog, setAutoSendDailyLog] = useState(
     Boolean(initialConfig?.autoSendDailyLog),
   );
+  const [pausedDate, setPausedDate] = useState<string | null>(
+    initialConfig?.pausedEveningLogDate || null,
+  );
+  const { dateStr: todayDateStr } = getLocalDateParts(new Date());
+  const isPausedToday = pausedDate === todayDateStr;
+
+  const handleTogglePauseEveningLog = () => {
+    startTransition(async () => {
+      try {
+        const res = await togglePauseEveningLogForTodayAction();
+        if (res.success) {
+          setPausedDate(res.pausedDate);
+          setStatusMessage({ type: "success", text: res.message });
+        }
+      } catch (err: any) {
+        setStatusMessage({
+          type: "error",
+          text: err.message || "Failed to toggle pause status.",
+        });
+      }
+    });
+  };
 
   // Telegram Notifications State
   const [telegramChatId, setTelegramChatId] = useState(
@@ -219,6 +245,7 @@ export default function SettingsTab({
           shiftEndTime,
           saturdayShiftEndTime,
           autoSendDailyLog,
+          pausedEveningLogDate: pausedDate,
           telegramChatId,
           telegramNotificationsEnabled,
         };
@@ -810,6 +837,72 @@ export default function SettingsTab({
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100"
                   />
                 </div>
+              </div>
+
+              {/* Holiday / Leave Pause Status Banner for Today */}
+              <div
+                className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs transition-all ${
+                  isPausedToday
+                    ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200"
+                    : "bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={`p-2 rounded-xl text-white ${
+                      isPausedToday ? "bg-amber-600" : "bg-slate-400"
+                    }`}
+                  >
+                    {isPausedToday ? (
+                      <Coffee className="w-4 h-4" />
+                    ) : (
+                      <PauseCircle className="w-4 h-4" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="font-bold flex items-center gap-2">
+                      <span>Today&apos;s Evening Dispatch:</span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          isPausedToday
+                            ? "bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200"
+                            : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                        }`}
+                      >
+                        {isPausedToday
+                          ? "Paused for Today (Holiday / Leave)"
+                          : "Active"}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      {isPausedToday
+                        ? "Tonight's auto-send is suspended. Automated dispatch will resume automatically tomorrow."
+                        : "Take a day off or holiday? You can pause tonight's automated email dispatch."}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleTogglePauseEveningLog}
+                  disabled={isPending}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 shrink-0 ${
+                    isPausedToday
+                      ? "bg-amber-200 hover:bg-amber-300 text-amber-950 dark:bg-amber-900 dark:hover:bg-amber-800 dark:text-amber-100"
+                      : "bg-slate-200 hover:bg-slate-300 text-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200"
+                  }`}
+                >
+                  {isPausedToday ? (
+                    <>
+                      <PlayCircle className="w-3.5 h-3.5" />
+                      <span>Resume Today</span>
+                    </>
+                  ) : (
+                    <>
+                      <Coffee className="w-3.5 h-3.5" />
+                      <span>Pause for Today</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
 

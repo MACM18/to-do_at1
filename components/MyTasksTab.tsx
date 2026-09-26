@@ -22,6 +22,9 @@ import {
   Users,
   Play,
   Eye,
+  Coffee,
+  PauseCircle,
+  PlayCircle,
 } from "lucide-react";
 import TaskCard from "./TaskCard";
 import TaskModal from "./TaskModal";
@@ -32,6 +35,7 @@ import EmailPreviewModal from "./EmailPreviewModal";
 import {
   triggerMorningReportAction,
   triggerEveningSummaryAction,
+  togglePauseEveningLogForTodayAction,
 } from "@/lib/actions/config-actions";
 import { saveTodayShift, getTodayShift } from "@/lib/actions/shift-actions";
 import { getTodayEmailDraftStatus } from "@/lib/actions/email-draft-actions";
@@ -81,10 +85,17 @@ export default function MyTasksTab({
   >("MORNING_PLAN");
   const [draftStatuses, setDraftStatuses] = useState<{
     morning: { hasDraft: boolean; isSent: boolean; sentAt: string | null };
-    evening: { hasDraft: boolean; isSent: boolean; sentAt: string | null };
+    evening: {
+      hasDraft: boolean;
+      isSent: boolean;
+      isPaused?: boolean;
+      pausedDate?: string | null;
+      pausedReason?: string | null;
+      sentAt: string | null;
+    };
   }>({
     morning: { hasDraft: false, isSent: false, sentAt: null },
-    evening: { hasDraft: false, isSent: false, sentAt: null },
+    evening: { hasDraft: false, isSent: false, isPaused: false, sentAt: null },
   });
 
   const loadDraftStatus = async () => {
@@ -96,6 +107,39 @@ export default function MyTasksTab({
         console.error("Failed to load email draft statuses", err);
       }
     }
+  };
+
+  const handleTogglePauseEveningLog = () => {
+    startTransition(async () => {
+      try {
+        const res = await togglePauseEveningLogForTodayAction();
+        if (res.success) {
+          setStatusMessage({
+            type: "success",
+            text: res.message,
+          });
+          setDraftStatuses((prev) => ({
+            ...prev,
+            evening: {
+              ...prev.evening,
+              isPaused: res.isPaused,
+              pausedDate: res.pausedDate,
+              pausedReason: res.pausedReason,
+            },
+          }));
+        } else {
+          setStatusMessage({
+            type: "error",
+            text: "Failed to update pause status.",
+          });
+        }
+      } catch (err: any) {
+        setStatusMessage({
+          type: "error",
+          text: err.message || "Failed to toggle pause status.",
+        });
+      }
+    });
   };
 
   const { startOfDay: todayStart, dayOfWeek: todayDay } = getDayBounds(
@@ -607,10 +651,14 @@ export default function MyTasksTab({
                   setEmailPreviewType("EVENING_TASKLOG");
                   setIsEmailPreviewOpen(true);
                 }}
-                className="w-full flex items-center justify-between p-3 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-950/60 border border-indigo-200/80 dark:border-indigo-900/50 text-indigo-900 dark:text-indigo-200 text-xs font-bold transition-all active:scale-98 shadow-sm group"
+                className={`w-full flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition-all active:scale-98 shadow-sm group ${
+                  draftStatuses.evening.isPaused
+                    ? "bg-amber-50/70 hover:bg-amber-100/80 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 border-amber-200 dark:border-amber-900/60 text-amber-900 dark:text-amber-200"
+                    : "bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-950/60 border-indigo-200/80 dark:border-indigo-900/50 text-indigo-900 dark:text-indigo-200"
+                }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-indigo-600 text-white shadow-sm">
+                  <div className={`p-2 rounded-xl text-white shadow-sm ${draftStatuses.evening.isPaused ? "bg-amber-600" : "bg-indigo-600"}`}>
                     <Moon className="w-4 h-4" />
                   </div>
                   <div className="text-left">
@@ -620,6 +668,10 @@ export default function MyTasksTab({
                         <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                           Sent
                         </span>
+                      ) : draftStatuses.evening.isPaused ? (
+                        <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200">
+                          Paused Today
+                        </span>
                       ) : draftStatuses.evening.hasDraft ? (
                         <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
                           Custom Draft Ready
@@ -628,9 +680,79 @@ export default function MyTasksTab({
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-indigo-200/70 dark:bg-indigo-900/60 text-indigo-900 dark:text-indigo-200 text-[11px] font-bold group-hover:bg-indigo-300/80 transition-colors">
+                <div className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold transition-colors ${
+                  draftStatuses.evening.isPaused
+                    ? "bg-amber-200/80 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 group-hover:bg-amber-300/80"
+                    : "bg-indigo-200/70 dark:bg-indigo-900/60 text-indigo-900 dark:text-indigo-200 group-hover:bg-indigo-300/80"
+                }`}>
                   <Eye className="w-3.5 h-3.5" />
                   <span>Preview</span>
+                </div>
+              </button>
+
+              {/* Pause / Resume Evening Task Log for Today Button (Holiday / Leave) */}
+              <button
+                type="button"
+                onClick={handleTogglePauseEveningLog}
+                disabled={isPending}
+                className={`w-full flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition-all active:scale-98 shadow-sm group ${
+                  draftStatuses.evening.isPaused
+                    ? "bg-amber-100/70 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-950/80 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200"
+                    : "bg-slate-50 hover:bg-slate-100/90 dark:bg-slate-800/50 dark:hover:bg-slate-800/80 border-slate-200/90 dark:border-slate-700/80 text-slate-700 dark:text-slate-300"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={`p-2 rounded-xl text-white shadow-sm transition-transform group-hover:scale-105 ${
+                      draftStatuses.evening.isPaused
+                        ? "bg-gradient-to-tr from-amber-600 to-orange-500"
+                        : "bg-slate-500"
+                    }`}
+                  >
+                    {draftStatuses.evening.isPaused ? (
+                      <Coffee className="w-4 h-4" />
+                    ) : (
+                      <PauseCircle className="w-4 h-4" />
+                    )}
+                  </div>
+                  <div className="text-left">
+                    <div className="font-bold flex items-center gap-1.5">
+                      <span>
+                        {draftStatuses.evening.isPaused
+                          ? "Evening Log Paused for Today"
+                          : "Pause Evening Log for Today"}
+                      </span>
+                      {draftStatuses.evening.isPaused && (
+                        <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200">
+                          Leave / Holiday
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] font-normal text-slate-500 dark:text-slate-400 mt-0.5">
+                      {draftStatuses.evening.isPaused
+                        ? "Tonight's auto-dispatch is skipped • Click to Resume"
+                        : "Holiday or leave day — skip tonight's email dispatch"}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold transition-colors ${
+                    draftStatuses.evening.isPaused
+                      ? "bg-amber-200 dark:bg-amber-900 text-amber-950 dark:text-amber-100 group-hover:bg-amber-300"
+                      : "bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200 group-hover:bg-slate-300/80"
+                  }`}
+                >
+                  {draftStatuses.evening.isPaused ? (
+                    <>
+                      <PlayCircle className="w-3.5 h-3.5" />
+                      <span>Resume</span>
+                    </>
+                  ) : (
+                    <>
+                      <Coffee className="w-3.5 h-3.5" />
+                      <span>Pause Today</span>
+                    </>
+                  )}
                 </div>
               </button>
 

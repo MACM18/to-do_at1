@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { sendMorningTodoList, sendDailySummaryReport } from '@/lib/mailer';
 import { processRecurringTasks } from '@/lib/recurrence';
 import { pruneOldEmailDrafts } from '@/lib/actions/email-draft-actions';
+import { getLocalDateParts } from '@/lib/time-utils';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -33,8 +34,13 @@ export async function GET(request: Request) {
     if (type === 'evening' || type === 'all') {
       const today = new Date();
       const isSunday = today.getDay() === 0;
+      const { dateStr: todayDateStr } = getLocalDateParts(today);
 
-      if (config?.autoSendDailyLog && !isSunday) {
+      if (config?.pausedEveningLogDate === todayDateStr) {
+        results.evening = {
+          skipped: `Evening task log dispatch is paused for today (${todayDateStr}) due to ${config.pausedEveningLogReason || 'Holiday / Leave'}.`,
+        };
+      } else if (config?.autoSendDailyLog && !isSunday) {
         const eveningRes = await sendDailySummaryReport();
         results.evening = eveningRes;
       } else {

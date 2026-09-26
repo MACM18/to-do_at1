@@ -9,7 +9,7 @@ import {
   sendEveningSummaryEmail,
 } from '../mailer';
 import { initScheduler } from '../scheduler';
-import { formatTo24HrDot } from '../time-utils';
+import { formatTo24HrDot, getLocalDateParts, getDayBounds } from '../time-utils';
 
 export async function getConfig() {
   if (!prisma || !prisma.appConfig) {
@@ -34,6 +34,8 @@ export async function getConfig() {
       saturdayShiftEndTime: '13.30',
       autoSendMorningReport: false,
       autoSendDailyLog: false,
+      pausedEveningLogDate: null,
+      pausedEveningLogReason: null,
       telegramChatId: '',
       telegramNotificationsEnabled: false,
     };
@@ -95,6 +97,8 @@ export async function updateConfig(data: {
   saturdayShiftEndTime?: string;
   autoSendMorningReport?: boolean;
   autoSendDailyLog?: boolean;
+  pausedEveningLogDate?: string | null;
+  pausedEveningLogReason?: string | null;
   telegramChatId?: string;
   telegramNotificationsEnabled?: boolean;
   defaultUserId?: string;
@@ -135,6 +139,10 @@ export async function updateConfig(data: {
     updatePayload.autoSendMorningReport = Boolean(data.autoSendMorningReport);
   if (data.autoSendDailyLog !== undefined)
     updatePayload.autoSendDailyLog = Boolean(data.autoSendDailyLog);
+  if (data.pausedEveningLogDate !== undefined)
+    updatePayload.pausedEveningLogDate = data.pausedEveningLogDate;
+  if (data.pausedEveningLogReason !== undefined)
+    updatePayload.pausedEveningLogReason = data.pausedEveningLogReason;
   if (data.telegramChatId !== undefined)
     updatePayload.telegramChatId = data.telegramChatId.trim();
   if (data.telegramNotificationsEnabled !== undefined)
@@ -154,6 +162,72 @@ export async function updateConfig(data: {
 
   revalidatePath('/');
   return config;
+}
+
+/**
+ * Toggles pause/resume of the evening task log automated dispatch for a given date (default today).
+ * Perfect for Holiday or Leave days.
+ */
+export async function togglePauseEveningLogForTodayAction(targetDate?: string | Date, reason?: string) {
+  const d = targetDate ? (typeof targetDate === 'string' ? new Date(targetDate) : targetDate) : new Date();
+  const { dateStr } = getLocalDateParts(d);
+
+  const config = await prisma.appConfig.findUnique({
+    where: { id: 'global_config' },
+  });
+
+  const isCurrentlyPaused = config?.pausedEveningLogDate === dateStr;
+
+  let newPausedDate: string | null = null;
+  let newReason: string | null = null;
+
+  if (!isCurrentlyPaused) {
+    newPausedDate = dateStr;
+    newReason = reason || 'Holiday / Leave';
+  }
+
+  const updatedConfig = await prisma.appConfig.upsert({
+    where: { id: 'global_config' },
+    update: {
+      pausedEveningLogDate: newPausedDate,
+      pausedEveningLogReason: newReason,
+    },
+    create: {
+      id: 'global_config',
+      pausedEveningLogDate: newPausedDate,
+      pausedEveningLogReason: newReason,
+    },
+  });
+
+  // Also update today's evening draft status if exists
+  const { startOfDay: todayStart, endOfDay: todayEnd } = getDayBounds(d);
+  const eveningDraft = await prisma.emailDraft.findFirst({
+    where: {
+      type: 'EVENING_TASKLOG',
+      date: { gte: todayStart, lte: todayEnd },
+    },
+  });
+
+  if (eveningDraft && eveningDraft.status !== 'SENT') {
+    await prisma.emailDraft.update({
+      where: { id: eveningDraft.id },
+      data: {
+        status: isCurrentlyPaused ? 'DRAFT' : 'PAUSED',
+      },
+    });
+  }
+
+  revalidatePath('/');
+  return {
+    success: true,
+    isPaused: !isCurrentlyPaused,
+    pausedDate: newPausedDate,
+    pausedReason: newReason,
+    config: updatedConfig,
+    message: !isCurrentlyPaused
+      ? `Today (${dateStr}) marked as Holiday / Leave. Automated evening task log email is paused for today.`
+      : `Evening task log automated dispatch resumed for today (${dateStr}).`,
+  };
 }
 
 export async function getTelegramStatusAction() {

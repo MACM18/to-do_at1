@@ -838,6 +838,16 @@ export async function sendEveningSummaryEmail(
     const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
     if (!config) throw new Error('Settings not configured.');
 
+    const { dateStr: targetDateStr } = getLocalDateParts(targetDate);
+    if (config.pausedEveningLogDate === targetDateStr) {
+      console.log(`[Mailer] Evening summary dispatch skipped for ${targetDateStr}: Paused for ${config.pausedEveningLogReason || 'Holiday / Leave'}.`);
+      return {
+        success: true,
+        skipped: true,
+        message: `Evening task log dispatch is paused for today (${targetDateStr}) due to ${config.pausedEveningLogReason || 'Holiday / Leave'}.`,
+      };
+    }
+
     const { toList, ccList, bccList } = resolveRecipients(config);
 
     if (toList.length === 0) {
