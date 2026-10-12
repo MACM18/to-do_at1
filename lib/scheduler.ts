@@ -1,4 +1,4 @@
-import cron from 'node-cron';
+import cron, { type ScheduledTask } from 'node-cron';
 import { prisma } from './prisma';
 import { sendDailySummaryReport } from './mailer';
 import { processRecurringTasks } from './recurrence';
@@ -10,9 +10,9 @@ const SCHEDULER_TIMEZONE = 'Asia/Colombo'; // UTC+05:30
  * Prevents multiple instances across Next.js re-evaluations
  */
 interface SchedulerTasks {
-  eveningWeekdayTask: cron.ScheduledTask | null;
-  eveningSaturdayTask: cron.ScheduledTask | null;
-  recurrenceMidnightTask: cron.ScheduledTask | null;
+  eveningWeekdayTask: ScheduledTask | null;
+  eveningSaturdayTask: ScheduledTask | null;
+  recurrenceMidnightTask: ScheduledTask | null;
 }
 
 const globalScheduler: SchedulerTasks =
@@ -39,15 +39,15 @@ export async function initScheduler() {
 
     // Stop existing scheduled tasks cleanly
     if (globalScheduler.eveningWeekdayTask) {
-      globalScheduler.eveningWeekdayTask.stop();
+      await globalScheduler.eveningWeekdayTask.stop();
       globalScheduler.eveningWeekdayTask = null;
     }
     if (globalScheduler.eveningSaturdayTask) {
-      globalScheduler.eveningSaturdayTask.stop();
+      await globalScheduler.eveningSaturdayTask.stop();
       globalScheduler.eveningSaturdayTask = null;
     }
     if (globalScheduler.recurrenceMidnightTask) {
-      globalScheduler.recurrenceMidnightTask.stop();
+      await globalScheduler.recurrenceMidnightTask.stop();
       globalScheduler.recurrenceMidnightTask = null;
     }
 

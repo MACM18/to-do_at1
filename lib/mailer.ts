@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { type Transporter } from 'nodemailer';
 import { prisma } from './prisma';
 import {
   getDayBounds,
@@ -506,7 +506,7 @@ export async function testSmtpConnection(customConfig?: any) {
   let isSecure = true;
 
   try {
-    let transporter: nodemailer.Transporter;
+    let transporter: Transporter;
 
     if (customConfig && customConfig.smtpHost) {
       let pass = customConfig.smtpPassword;

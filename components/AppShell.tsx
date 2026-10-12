@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useEffect, useRef, useState, useTransition } from 'react';
 import {
   CheckSquare,
   Users,
@@ -42,6 +42,9 @@ export default function AppShell({
   const [activeTab, setActiveTab] = useState<'MY_TASKS' | 'TEAM_VIEW' | 'REPORTS' | 'SETTINGS'>('MY_TASKS');
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isLoggingOut, startLogoutTransition] = useTransition();
+  const [isRefreshing, startRefreshTransition] = useTransition();
+  const [refreshStatus, setRefreshStatus] = useState<'refreshing' | 'refreshed' | null>(null);
+  const refreshWasPending = useRef(false);
 
   const currentUser = sessionUser || initialUsers[0] || {
     id: 'default',
@@ -51,8 +54,32 @@ export default function AppShell({
   };
 
   const handleRefresh = () => {
-    router.refresh();
+    if (isRefreshing) return;
+    setRefreshStatus('refreshing');
+    startRefreshTransition(() => router.refresh());
   };
+
+  useEffect(() => {
+    if (isRefreshing) {
+      refreshWasPending.current = true;
+      return;
+    }
+
+    if (refreshWasPending.current) {
+      refreshWasPending.current = false;
+      setRefreshStatus('refreshed');
+      const timeout = window.setTimeout(() => setRefreshStatus(null), 3000);
+      return () => window.clearTimeout(timeout);
+    }
+  }, [isRefreshing]);
+
+  const currentDate = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'Asia/Colombo',
+  }).format(new Date());
 
   const handleLogout = () => {
     startLogoutTransition(async () => {
@@ -135,10 +162,13 @@ export default function AppShell({
           <div className="flex items-center gap-2">
             <button
               onClick={handleRefresh}
-              className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              title="Refresh Data"
+              disabled={isRefreshing}
+              className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-60"
+              title={isRefreshing ? 'Refreshing data' : 'Refresh data'}
+              aria-label={isRefreshing ? 'Refreshing data' : 'Refresh data'}
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isRefreshing ? 'Refreshing' : 'Refresh'}</span>
             </button>
 
             {/* Touch-Friendly User Profile Circle Avatar & Popover Menu */}
@@ -228,6 +258,33 @@ export default function AppShell({
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 pt-4 sm:pt-6 pb-28 sm:pb-8">
+        <div className="mb-5 flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-blue-600 dark:text-blue-400">Today</p>
+            <p className="mt-0.5 text-sm font-bold text-slate-900 dark:text-slate-100">{currentDate}</p>
+          </div>
+          <span className="hidden sm:inline text-[10px] font-medium text-slate-400">Daily focus &amp; team progress</span>
+        </div>
+
+        {refreshStatus && (
+          <div
+            role="status"
+            aria-live="polite"
+            className={`fixed right-4 top-20 z-50 flex items-center gap-2 rounded-2xl border px-4 py-3 text-xs font-semibold shadow-lg animate-in fade-in slide-in-from-top-2 duration-200 ${
+              refreshStatus === 'refreshing'
+                ? 'border-blue-200 bg-white text-blue-800 dark:border-blue-900 dark:bg-slate-900 dark:text-blue-300'
+                : 'border-emerald-200 bg-white text-emerald-800 dark:border-emerald-900 dark:bg-slate-900 dark:text-emerald-300'
+            }`}
+          >
+            {refreshStatus === 'refreshing' ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckSquare className="h-4 w-4" />
+            )}
+            <span>{refreshStatus === 'refreshing' ? 'Refreshing your data…' : 'Data refreshed'}</span>
+          </div>
+        )}
+
         {activeTab === 'MY_TASKS' && (
           <MyTasksTab
             currentUser={currentUser}
