@@ -29,7 +29,7 @@ import {
 } from '@/lib/actions/task-actions';
 import ConfirmDialog from './ConfirmDialog';
 import confetti from 'canvas-confetti';
-import { getDayBounds, formatLocalDate } from '@/lib/time-utils';
+import { getDayBounds, formatLocalDate, formatStoredTime } from '@/lib/time-utils';
 
 interface Subtask {
   id: string;
@@ -361,12 +361,12 @@ export default function TaskCard({
                     title="Click to adjust start time or end time"
                   >
                     <Clock className="w-2.5 h-2.5 text-blue-500" />
-                    <span>{task.startTime || '8.30'} - {task.endTime || 'Done'}</span>
+                    <span>{formatStoredTime(task.startTime || '08:30')} - {task.endTime ? formatStoredTime(task.endTime) : 'Done'}</span>
                   </button>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 font-mono shrink-0">
                     <Clock className="w-2.5 h-2.5" />
-                    {task.startTime || '8.30'} - {task.endTime || 'Done'}
+                    {formatStoredTime(task.startTime || '08:30')} - {task.endTime ? formatStoredTime(task.endTime) : 'Done'}
                   </span>
                 )
               ) : null}
@@ -526,14 +526,14 @@ export default function TaskCard({
                         title="Click to adjust start or end time"
                       >
                         <Clock className="w-3 h-3 text-blue-500" />
-                        <span>{task.startTime ? task.startTime : 'Start'}</span>
-                        <span>{task.endTime ? ` - ${task.endTime}` : ''}</span>
+                        <span>{task.startTime ? formatStoredTime(task.startTime) : 'Start'}</span>
+                        <span>{task.endTime ? ` - ${formatStoredTime(task.endTime)}` : ''}</span>
                       </button>
                     ) : (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                         <Clock className="w-3 h-3 text-blue-500" />
-                        <span>{task.startTime ? task.startTime : 'Start'}</span>
-                        <span>{task.endTime ? ` - ${task.endTime}` : ''}</span>
+                        <span>{task.startTime ? formatStoredTime(task.startTime) : 'Start'}</span>
+                        <span>{task.endTime ? ` - ${formatStoredTime(task.endTime)}` : ''}</span>
                       </span>
                     )
                   ) : !isDone ? (

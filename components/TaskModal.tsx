@@ -20,7 +20,8 @@ import {
   CalendarDays,
 } from 'lucide-react';
 import { createTask, updateTask } from '@/lib/actions/task-actions';
-import { getLocalTimeDot } from '@/lib/time-utils';
+import { getLocalTime24, formatStoredTime } from '@/lib/time-utils';
+import TimeInput from './TimeInput';
 
 interface UserOption {
   id: string;
@@ -122,6 +123,7 @@ export default function TaskModal({
   const [dueDate, setDueDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [timeError, setTimeError] = useState('');
   const [priority, setPriority] = useState('High');
   const [assignedBy, setAssignedBy] = useState('Myself');
   const [taskStatus, setTaskStatus] = useState('TODO');
@@ -140,8 +142,8 @@ export default function TaskModal({
           ? new Date(editingTask.dueDate).toISOString().split('T')[0]
           : ''
       );
-      setStartTime(editingTask.startTime || '');
-      setEndTime(editingTask.endTime || '');
+      setStartTime(formatStoredTime(editingTask.startTime));
+      setEndTime(formatStoredTime(editingTask.endTime));
       setPriority(editingTask.priority || 'High');
       setAssignedBy(editingTask.assignedBy || 'Myself');
       setTaskStatus(editingTask.status || (editingTask.progress === 100 ? 'DONE' : 'TODO'));
@@ -267,6 +269,7 @@ export default function TaskModal({
     if (!title.trim()) return;
 
     startTransition(async () => {
+      try {
       if (editingTask) {
         await updateTask(editingTask.id, {
           title,
@@ -303,6 +306,9 @@ export default function TaskModal({
         });
       }
       onClose();
+      } catch (error: unknown) {
+        setTimeError(error instanceof Error ? error.message : 'Unable to save task times.');
+      }
     });
   };
 
@@ -449,31 +455,29 @@ export default function TaskModal({
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                       Start Time
                     </label>
-                    <input
-                      type="text"
+                    <TimeInput
                       value={startTime}
-                      onChange={(e) => setStartTime(e.target.value)}
-                      placeholder="e.g., 08.30"
+                      onChange={(value) => { setStartTime(value); setTimeError(''); }}
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                     />
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       <button
                         type="button"
-                        onClick={() => setStartTime(getLocalTimeDot(new Date(), 'Asia/Colombo'))}
+                        onClick={() => setStartTime(formatStoredTime(getLocalTime24(new Date(), 'Asia/Colombo')))}
                         className="px-1.5 py-0.5 text-[10px] font-bold rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 hover:bg-blue-200"
                       >
                         Now
                       </button>
                       <button
                         type="button"
-                        onClick={() => setStartTime('08.30')}
+                        onClick={() => setStartTime('08:30')}
                         className="px-1.5 py-0.5 text-[10px] font-semibold rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300"
                       >
                         08.30
                       </button>
                       <button
                         type="button"
-                        onClick={() => setStartTime('08.45')}
+                        onClick={() => setStartTime('08:45')}
                         className="px-1.5 py-0.5 text-[10px] font-semibold rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300"
                       >
                         08.45
@@ -494,31 +498,29 @@ export default function TaskModal({
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                       End Time
                     </label>
-                    <input
-                      type="text"
+                    <TimeInput
                       value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
-                      placeholder="e.g., 17.30"
+                      onChange={(value) => { setEndTime(value); setTimeError(''); }}
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                     />
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       <button
                         type="button"
-                        onClick={() => setEndTime(getLocalTimeDot(new Date(), 'Asia/Colombo'))}
+                        onClick={() => setEndTime(formatStoredTime(getLocalTime24(new Date(), 'Asia/Colombo')))}
                         className="px-1.5 py-0.5 text-[10px] font-bold rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200"
                       >
                         Now
                       </button>
                       <button
                         type="button"
-                        onClick={() => setEndTime('17.30')}
+                        onClick={() => setEndTime('17:30')}
                         className="px-1.5 py-0.5 text-[10px] font-semibold rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300"
                       >
                         17.30
                       </button>
                       <button
                         type="button"
-                        onClick={() => setEndTime('13.30')}
+                        onClick={() => setEndTime('13:30')}
                         className="px-1.5 py-0.5 text-[10px] font-semibold rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300"
                       >
                         13.30
@@ -535,6 +537,7 @@ export default function TaskModal({
                     </div>
                   </div>
                 </div>
+                {timeError && <p className="text-xs text-rose-600 dark:text-rose-400" role="alert">{timeError}</p>}
               </div>
 
               {/* Status & Priority & Assigned By */}

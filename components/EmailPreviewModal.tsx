@@ -30,6 +30,8 @@ import {
   sendEmailDraftNow,
 } from '@/lib/actions/email-draft-actions';
 import { togglePauseEveningLogForTodayAction } from '@/lib/actions/config-actions';
+import TimeInput from './TimeInput';
+import { formatStoredTime } from '@/lib/time-utils';
 
 interface EmailPreviewModalProps {
   isOpen: boolean;
@@ -66,8 +68,8 @@ export default function EmailPreviewModal({
   const [ccRecipients, setCcRecipients] = useState('');
   const [bccRecipients, setBccRecipients] = useState('');
   const [bodyHtml, setBodyHtml] = useState('');
-  const [checkInTime, setCheckInTime] = useState(initialCheckInTime || '08.30');
-  const [checkOutTime, setCheckOutTime] = useState(initialCheckOutTime || '17.30');
+  const [checkInTime, setCheckInTime] = useState(formatStoredTime(initialCheckInTime || '08:30'));
+  const [checkOutTime, setCheckOutTime] = useState(formatStoredTime(initialCheckOutTime || '17:30'));
   const [isCustomized, setIsCustomized] = useState(false);
   const [draftStatus, setDraftStatus] = useState<'DRAFT' | 'SENT'>('DRAFT');
   const [sentAt, setSentAt] = useState<string | null>(null);
@@ -102,8 +104,8 @@ export default function EmailPreviewModal({
       setCcRecipients(data.ccRecipients || '');
       setBccRecipients(data.bccRecipients || '');
       setBodyHtml(data.bodyHtml || '');
-      setCheckInTime(data.checkInTime || '08.30');
-      setCheckOutTime(data.checkOutTime || '17.30');
+      setCheckInTime(formatStoredTime(data.checkInTime || '08:30'));
+      setCheckOutTime(formatStoredTime(data.checkOutTime || '17:30'));
       setIsCustomized(data.isCustomized);
       setDraftStatus((data.status as any) || 'DRAFT');
       setSentAt(data.sentAt);
@@ -457,27 +459,21 @@ export default function EmailPreviewModal({
                 <div className="flex items-center gap-2">
                   <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                   <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Check-in:</span>
-                  <input
-                    type="text"
+                  <TimeInput
                     value={checkInTime}
-                    onChange={(e) => setCheckInTime(e.target.value)}
-                    placeholder="08.30"
+                    onChange={setCheckInTime}
                     className="w-20 px-2 py-1 text-xs font-mono font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-center"
                   />
-                  <span className="text-[10px] text-slate-400">(24h format)</span>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <Clock className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                   <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Check-out:</span>
-                  <input
-                    type="text"
+                  <TimeInput
                     value={checkOutTime}
-                    onChange={(e) => setCheckOutTime(e.target.value)}
-                    placeholder="17.30"
+                    onChange={setCheckOutTime}
                     className="w-20 px-2 py-1 text-xs font-mono font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-center"
                   />
-                  <span className="text-[10px] text-slate-400">(24h format)</span>
                 </div>
               </div>
             </div>

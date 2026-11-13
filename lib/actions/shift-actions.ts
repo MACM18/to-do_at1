@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '../prisma';
-import { getDayBounds } from '../time-utils';
+import { getDayBounds, normalizeTimeInput } from '../time-utils';
 
 export async function getTodayShift(userId: string) {
   const { startOfDay: todayStart, endOfDay: todayEnd } = getDayBounds(new Date());
@@ -41,9 +41,9 @@ export async function saveTodayShift(data: {
     shift = await prisma.dailyShift.update({
       where: { id: existing.id },
       data: {
-        shiftStartTime: data.shiftStartTime?.trim() || existing.shiftStartTime,
-        prepEndTime: data.prepEndTime?.trim() || existing.prepEndTime,
-        shiftEndTime: data.shiftEndTime?.trim() || existing.shiftEndTime,
+        shiftStartTime: data.shiftStartTime?.trim() ? normalizeTimeInput(data.shiftStartTime) : existing.shiftStartTime,
+        prepEndTime: data.prepEndTime?.trim() ? normalizeTimeInput(data.prepEndTime) : existing.prepEndTime,
+        shiftEndTime: data.shiftEndTime?.trim() ? normalizeTimeInput(data.shiftEndTime) : existing.shiftEndTime,
       },
     });
   } else {
@@ -51,9 +51,9 @@ export async function saveTodayShift(data: {
       data: {
         userId: data.userId,
         date: todayStart,
-        shiftStartTime: data.shiftStartTime?.trim() || null,
-        prepEndTime: data.prepEndTime?.trim() || null,
-        shiftEndTime: data.shiftEndTime?.trim() || null,
+        shiftStartTime: data.shiftStartTime?.trim() ? normalizeTimeInput(data.shiftStartTime) : null,
+        prepEndTime: data.prepEndTime?.trim() ? normalizeTimeInput(data.prepEndTime) : null,
+        shiftEndTime: data.shiftEndTime?.trim() ? normalizeTimeInput(data.shiftEndTime) : null,
       },
     });
   }

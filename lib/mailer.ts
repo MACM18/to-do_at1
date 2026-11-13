@@ -2,8 +2,9 @@ import nodemailer, { type Transporter } from 'nodemailer';
 import { prisma } from './prisma';
 import {
   getDayBounds,
-  getLocalTimeDot,
-  formatTo24HrDot,
+  normalizeTimeInput,
+  formatStoredTime,
+  formatTimesInHtml,
   getLocalDateParts,
   formatLocalDate,
 } from './time-utils';
@@ -301,11 +302,11 @@ export function buildReportTableHtml(options: {
 
   const { formattedLong: dateHeader, dayOfWeek } = getLocalDateParts(targetDate);
   const isSaturday = dayOfWeek === 6;
-  const defaultShiftEnd = isSaturday ? '13.30' : config?.shiftEndTime ? formatTo24HrDot(config.shiftEndTime) : '17.30';
+  const defaultShiftEnd = isSaturday ? '13:30' : config?.shiftEndTime ? normalizeTimeInput(config.shiftEndTime) : '17:30';
 
-  const shiftStart = formatTo24HrDot(customShift?.shiftStartTime || config?.shiftStartTime || '08.30');
-  const prepEnd = formatTo24HrDot(customShift?.prepEndTime || config?.prepEndTime || '08.45');
-  const shiftEnd = formatTo24HrDot(customShift?.shiftEndTime || defaultShiftEnd);
+  const shiftStart = normalizeTimeInput(customShift?.shiftStartTime || config?.shiftStartTime || '08:30');
+  const prepEnd = normalizeTimeInput(customShift?.prepEndTime || config?.prepEndTime || '08:45');
+  const shiftEnd = normalizeTimeInput(customShift?.shiftEndTime || defaultShiftEnd);
 
   // Calculate Overall Productivity Ratio (tasks + meetings)
   const totalItems = tasks.length + meetings.length;
@@ -364,8 +365,8 @@ export function buildReportTableHtml(options: {
     // Render Tasks
     rowsHtml += tasks
       .map((t) => {
-        const startVal = isMorning ? '' : formatTo24HrDot(t.startTime);
-        const endVal = isMorning ? '' : formatTo24HrDot(t.endTime);
+        const startVal = isMorning ? '' : formatStoredTime(t.startTime);
+        const endVal = isMorning ? '' : formatStoredTime(t.endTime);
         const statusText = getStatusText(t.status, t.progress);
         const priorityText = t.priority || 'High';
         const assignedByText = t.assignedBy || 'Myself';
@@ -403,8 +404,8 @@ export function buildReportTableHtml(options: {
     if (meetings && meetings.length > 0) {
       rowsHtml += meetings
         .map((m) => {
-          const startVal = isMorning ? '' : formatTo24HrDot(m.startTime);
-          const endVal = isMorning ? '' : formatTo24HrDot(m.endTime);
+          const startVal = isMorning ? '' : formatStoredTime(m.startTime);
+          const endVal = isMorning ? '' : formatStoredTime(m.endTime);
           return `
             <tr style="background-color: #fafafa;">
               <td style="${cellBorder} text-align: right; width: 68px;">${startVal}</td>
@@ -448,7 +449,7 @@ export function buildReportTableHtml(options: {
         </thead>
         <tbody>
           <tr>
-            <td style="${cellBorder} text-align: right;">${shiftStart}</td>
+            <td style="${cellBorder} text-align: right;">${formatStoredTime(shiftStart)}</td>
             <td style="${cellBorder}"></td>
             <td colspan="5" style="${cellBorder} background-color: #999999; color: #000000; text-align: center; font-weight: 500;">
               Shift started & Sign In
@@ -456,8 +457,8 @@ export function buildReportTableHtml(options: {
           </tr>
 
           <tr>
-            <td style="${cellBorder} text-align: right;">${isMorning ? '' : shiftStart}</td>
-            <td style="${cellBorder} text-align: right;">${isMorning ? '' : prepEnd}</td>
+            <td style="${cellBorder} text-align: right;">${isMorning ? '' : formatStoredTime(shiftStart)}</td>
+            <td style="${cellBorder} text-align: right;">${isMorning ? '' : formatStoredTime(prepEnd)}</td>
             <td colspan="5" style="${cellBorder}">
               Prepared the Day Plan and prepared for the day
             </td>
@@ -475,7 +476,7 @@ export function buildReportTableHtml(options: {
 
           <tr>
             <td style="${cellBorder}"></td>
-            <td style="${cellBorder} text-align: right;">${isMorning ? '' : shiftEnd}</td>
+            <td style="${cellBorder} text-align: right;">${isMorning ? '' : formatStoredTime(shiftEnd)}</td>
             <td colspan="5" style="${cellBorder} background-color: #999999; color: #000000; text-align: center; font-weight: 500;">
               Shift End & Sign Out
             </td>
@@ -714,7 +715,7 @@ export async function sendMorningReportEmail(userId?: string, customCheckInTime?
       orderBy: { createdAt: 'desc' },
     });
 
-    const emailHtml = savedDraft?.bodyHtml || buildReportTableHtml({
+    const emailHtml = savedDraft?.bodyHtml ? formatTimesInHtml(savedDraft.bodyHtml) : buildReportTableHtml({
       user: targetUser,
       tasks,
       meetings,
@@ -778,10 +779,10 @@ export async function sendMorningReportEmail(userId?: string, customCheckInTime?
     );
 
     const effectiveCheckIn = shift?.shiftStartTime
-      ? formatTo24HrDot(shift.shiftStartTime)
+      ? normalizeTimeInput(shift.shiftStartTime)
       : customCheckInTime
-      ? formatTo24HrDot(customCheckInTime)
-      : formatTo24HrDot(config?.shiftStartTime || '08.30');
+      ? normalizeTimeInput(customCheckInTime)
+      : normalizeTimeInput(config?.shiftStartTime || '08:30');
 
     // Trigger Telegram Day Plan delivery success alert (non-blocking)
     notifyDayPlanSuccess({
@@ -878,12 +879,12 @@ export async function sendEveningSummaryEmail(
     }
 
     const isSaturday = todayStart.getDay() === 6;
-    const satEnd = config?.saturdayShiftEndTime ? formatTo24HrDot(config.saturdayShiftEndTime) : '13.30';
-    const weekdayEnd = config?.shiftEndTime ? formatTo24HrDot(config.shiftEndTime) : '17.30';
+    const satEnd = config?.saturdayShiftEndTime ? normalizeTimeInput(config.saturdayShiftEndTime) : '13:30';
+    const weekdayEnd = config?.shiftEndTime ? normalizeTimeInput(config.shiftEndTime) : '17:30';
     const defaultEnd = isSaturday ? satEnd : weekdayEnd;
 
     if (customCheckOutTime && customCheckOutTime.trim()) {
-      const formattedCheckout = formatTo24HrDot(customCheckOutTime);
+      const formattedCheckout = normalizeTimeInput(customCheckOutTime);
       const existing = await prisma.dailyShift.findFirst({
         where: { userId: targetUser.id, date: { gte: todayStart, lte: todayEnd } },
       });
@@ -912,11 +913,11 @@ export async function sendEveningSummaryEmail(
     });
 
     let finalShiftEnd =
-      (customCheckOutTime?.trim() ? formatTo24HrDot(customCheckOutTime) : null) ||
-      (userShift?.shiftEndTime ? formatTo24HrDot(userShift.shiftEndTime) : null) ||
+      (customCheckOutTime?.trim() ? normalizeTimeInput(customCheckOutTime) : null) ||
+      (userShift?.shiftEndTime ? normalizeTimeInput(userShift.shiftEndTime) : null) ||
       defaultEnd;
 
-    if (isSaturday && (!finalShiftEnd || finalShiftEnd === '17.30' || finalShiftEnd === '5.30')) {
+    if (isSaturday && (!finalShiftEnd || finalShiftEnd === '17:30' || finalShiftEnd === '05:30')) {
       finalShiftEnd = satEnd;
     }
 
@@ -929,7 +930,7 @@ export async function sendEveningSummaryEmail(
       include: { subtasks: true },
     });
 
-    const shiftStartVal = formatTo24HrDot(userShift?.shiftStartTime || config?.shiftStartTime || '08.30');
+    const shiftStartVal = normalizeTimeInput(userShift?.shiftStartTime || config?.shiftStartTime || '08:30');
 
     for (const t of allDailyTasks) {
       if (t.subtasks && t.subtasks.length > 0) {
@@ -939,8 +940,8 @@ export async function sendEveningSummaryEmail(
         });
       }
 
-      let resolvedEndTime = t.endTime ? formatTo24HrDot(t.endTime) : null;
-      if (!resolvedEndTime || (isSaturday && (resolvedEndTime === '17.30' || resolvedEndTime === '5.30'))) {
+      let resolvedEndTime = t.endTime ? normalizeTimeInput(t.endTime) : null;
+      if (!resolvedEndTime || (isSaturday && (resolvedEndTime === '17:30' || resolvedEndTime === '05:30'))) {
         resolvedEndTime = finalShiftEnd;
       }
 
@@ -949,7 +950,7 @@ export async function sendEveningSummaryEmail(
         data: {
           status: 'DONE',
           progress: 100,
-          startTime: t.startTime ? formatTo24HrDot(t.startTime) : shiftStartVal,
+          startTime: t.startTime ? normalizeTimeInput(t.startTime) : shiftStartVal,
           endTime: resolvedEndTime,
         },
       });
@@ -1000,7 +1001,7 @@ export async function sendEveningSummaryEmail(
       orderBy: { createdAt: 'desc' },
     });
 
-    let combinedHtml = savedDraft?.bodyHtml || '';
+    let combinedHtml = savedDraft?.bodyHtml ? formatTimesInHtml(savedDraft.bodyHtml) : '';
 
     // If no customized draft was saved, generate HTML strictly for targetUser only (matching preview)
     if (!combinedHtml) {
@@ -1115,4 +1116,3 @@ export async function sendEveningSummaryEmail(
 export const verifySmtpConnection = testSmtpConnection;
 export const sendMorningTodoList = sendMorningReportEmail;
 export const sendDailySummaryReport = sendEveningSummaryEmail;
-

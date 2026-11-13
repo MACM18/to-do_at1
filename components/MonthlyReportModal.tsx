@@ -18,7 +18,7 @@ import {
 import { getMonthlyReportData } from '@/lib/actions/task-actions';
 import { autoSaveGeneratedReport } from '@/lib/actions/report-actions';
 import { generateMonthlyReportPdf } from '@/lib/pdf-report-generator';
-import { getLocalDateParts } from '@/lib/time-utils';
+import { getLocalDateParts, formatStoredTime } from '@/lib/time-utils';
 
 interface MonthlyReportModalProps {
   isOpen: boolean;
@@ -188,8 +188,8 @@ export default function MonthlyReportModal({
       `"${t.priority || 'High'}"`,
       `"${t.assignedBy || 'Myself'}"`,
       `"${t.status === 'DONE' ? 'Completed' : 'In progress'}"`,
-      `"${t.startTime || ''}"`,
-      `"${t.endTime || ''}"`,
+      `"${formatStoredTime(t.startTime)}"`,
+      `"${formatStoredTime(t.endTime)}"`,
       `"${Number(t.progress || 0).toFixed(2)}%"`,
     ]);
 

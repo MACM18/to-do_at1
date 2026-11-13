@@ -4,8 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '../prisma';
 import { processRecurringTasks } from '../recurrence';
 import {
-  getLocalTimeDot,
-  formatTo24HrDot,
+  getLocalTime24,
+  normalizeTimeInput,
   getDayBounds,
   getWeekBounds,
   getMonthBounds,
@@ -155,8 +155,8 @@ export async function createTask(formData: {
       recurrence: formData.recurrence || 'NONE',
       userId: formData.userId,
       dueDate: formData.dueDate ? new Date(formData.dueDate) : null,
-      startTime: formData.startTime?.trim() || (formData.recurrence === 'DAILY' ? '08.30' : null),
-      endTime: formData.endTime?.trim() || null,
+      startTime: formData.startTime?.trim() ? normalizeTimeInput(formData.startTime) : (formData.recurrence === 'DAILY' ? '08:30' : null),
+      endTime: formData.endTime?.trim() ? normalizeTimeInput(formData.endTime) : null,
       priority: formData.priority || 'High',
       assignedBy: formData.assignedBy?.trim() || 'Myself',
       status: initialStatus,
@@ -207,8 +207,8 @@ export async function updateTask(
   if (data.progress !== undefined) updatePayload.progress = data.progress;
   if (data.dueDate !== undefined)
     updatePayload.dueDate = data.dueDate ? new Date(data.dueDate) : null;
-  if (data.startTime !== undefined) updatePayload.startTime = data.startTime?.trim() || null;
-  if (data.endTime !== undefined) updatePayload.endTime = data.endTime?.trim() || null;
+  if (data.startTime !== undefined) updatePayload.startTime = data.startTime?.trim() ? normalizeTimeInput(data.startTime) : null;
+  if (data.endTime !== undefined) updatePayload.endTime = data.endTime?.trim() ? normalizeTimeInput(data.endTime) : null;
   if (data.priority !== undefined) updatePayload.priority = data.priority;
   if (data.assignedBy !== undefined) updatePayload.assignedBy = data.assignedBy?.trim() || 'Myself';
 
@@ -347,7 +347,7 @@ export async function reassignTeamTask(taskId: string, newUserId: string) {
 }
 
 function getCurrentDotTime(): string {
-  return getLocalTimeDot();
+  return getLocalTime24();
 }
 
 export async function startTask(taskId: string) {
@@ -355,11 +355,11 @@ export async function startTask(taskId: string) {
   if (!task) return null;
 
   const updateData: any = {};
-  const currentTime = getLocalTimeDot(new Date(), 'Asia/Colombo');
+  const currentTime = getLocalTime24(new Date(), 'Asia/Colombo');
 
   if (task.recurrence === 'DAILY') {
     const config = await prisma.appConfig.findUnique({ where: { id: 'global_config' } });
-    updateData.startTime = formatTo24HrDot(config?.shiftStartTime || '08.30');
+    updateData.startTime = normalizeTimeInput(config?.shiftStartTime || '08:30');
   } else {
     updateData.startTime = currentTime;
   }
@@ -406,7 +406,7 @@ export async function toggleTaskComplete(taskId: string, currentStatus: string) 
 
   if (nextDone) {
     if (!task.startTime) {
-      taskUpdateData.startTime = task.recurrence === 'DAILY' ? '08.30' : currentTime;
+    taskUpdateData.startTime = task.recurrence === 'DAILY' ? '08:30' : currentTime;
     }
     taskUpdateData.endTime = currentTime;
   }
@@ -461,7 +461,7 @@ export async function toggleSubtask(subtaskId: string, taskId: string) {
 
   // If subtask started/toggled and parent task has no startTime, set it
   if (parentTask && !parentTask.startTime) {
-    taskUpdateData.startTime = parentTask.recurrence === 'DAILY' ? '08.30' : currentTime;
+    taskUpdateData.startTime = parentTask.recurrence === 'DAILY' ? '08:30' : currentTime;
   }
 
   // If task reaches 100% completion, record endTime

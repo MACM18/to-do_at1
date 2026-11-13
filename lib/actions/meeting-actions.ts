@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '../prisma';
-import { getDayBounds } from '../time-utils';
+import { getDayBounds, normalizeTimeInput } from '../time-utils';
 
 export async function getTodayMeetings(userId: string, targetDate?: Date) {
   if (!prisma || !prisma.meetingLog) {
@@ -43,8 +43,8 @@ export async function createMeeting(formData: {
   const meeting = await prisma.meetingLog.create({
     data: {
       title: formData.title.trim(),
-      startTime: formData.startTime.trim(),
-      endTime: formData.endTime.trim(),
+      startTime: normalizeTimeInput(formData.startTime),
+      endTime: normalizeTimeInput(formData.endTime),
       description: formData.description?.trim() || null,
       userId: formData.userId,
       date: meetingDate,
@@ -66,8 +66,8 @@ export async function updateMeeting(
 ) {
   const updatePayload: any = {};
   if (formData.title !== undefined) updatePayload.title = formData.title.trim();
-  if (formData.startTime !== undefined) updatePayload.startTime = formData.startTime.trim();
-  if (formData.endTime !== undefined) updatePayload.endTime = formData.endTime.trim();
+  if (formData.startTime !== undefined) updatePayload.startTime = normalizeTimeInput(formData.startTime);
+  if (formData.endTime !== undefined) updatePayload.endTime = normalizeTimeInput(formData.endTime);
   if (formData.description !== undefined) updatePayload.description = formData.description?.trim() || null;
 
   const meeting = await prisma.meetingLog.update({

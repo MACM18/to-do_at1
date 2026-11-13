@@ -9,7 +9,7 @@ import {
   sendEveningSummaryEmail,
 } from '../mailer';
 import { initScheduler } from '../scheduler';
-import { formatTo24HrDot, getLocalDateParts, getDayBounds } from '../time-utils';
+import { normalizeTimeInput, getLocalDateParts, getDayBounds } from '../time-utils';
 
 export async function getConfig() {
   if (!prisma || !prisma.appConfig) {
@@ -28,10 +28,10 @@ export async function getConfig() {
       morningReportTime: '08:00',
       eveningReportTime: '18:00',
       saturdayReportTime: '13:30',
-      shiftStartTime: '08.30',
-      prepEndTime: '08.45',
-      shiftEndTime: '17.30',
-      saturdayShiftEndTime: '13.30',
+      shiftStartTime: '08:30',
+      prepEndTime: '08:45',
+      shiftEndTime: '17:30',
+      saturdayShiftEndTime: '13:30',
       autoSendMorningReport: false,
       autoSendDailyLog: false,
       pausedEveningLogDate: null,
@@ -62,10 +62,10 @@ export async function getConfig() {
         morningReportTime: '08:00',
         eveningReportTime: '18:00',
         saturdayReportTime: '13:30',
-        shiftStartTime: '08.30',
-        prepEndTime: '08.45',
-        shiftEndTime: '17.30',
-        saturdayShiftEndTime: '13.30',
+        shiftStartTime: '08:30',
+        prepEndTime: '08:45',
+        shiftEndTime: '17:30',
+        saturdayShiftEndTime: '13:30',
         autoSendMorningReport: false,
         autoSendDailyLog: false,
         telegramChatId: '',
@@ -122,19 +122,19 @@ export async function updateConfig(data: {
   if (data.bccRecipients !== undefined)
     updatePayload.bccRecipients = data.bccRecipients.trim();
   if (data.morningReportTime !== undefined)
-    updatePayload.morningReportTime = data.morningReportTime.trim();
+    updatePayload.morningReportTime = normalizeTimeInput(data.morningReportTime);
   if (data.eveningReportTime !== undefined)
-    updatePayload.eveningReportTime = data.eveningReportTime.trim();
+    updatePayload.eveningReportTime = normalizeTimeInput(data.eveningReportTime);
   if (data.saturdayReportTime !== undefined)
-    updatePayload.saturdayReportTime = data.saturdayReportTime.trim();
+    updatePayload.saturdayReportTime = normalizeTimeInput(data.saturdayReportTime);
   if (data.shiftStartTime !== undefined)
-    updatePayload.shiftStartTime = formatTo24HrDot(data.shiftStartTime);
+    updatePayload.shiftStartTime = normalizeTimeInput(data.shiftStartTime);
   if (data.prepEndTime !== undefined)
-    updatePayload.prepEndTime = formatTo24HrDot(data.prepEndTime);
+    updatePayload.prepEndTime = normalizeTimeInput(data.prepEndTime);
   if (data.shiftEndTime !== undefined)
-    updatePayload.shiftEndTime = formatTo24HrDot(data.shiftEndTime);
+    updatePayload.shiftEndTime = normalizeTimeInput(data.shiftEndTime);
   if (data.saturdayShiftEndTime !== undefined)
-    updatePayload.saturdayShiftEndTime = formatTo24HrDot(data.saturdayShiftEndTime);
+    updatePayload.saturdayShiftEndTime = normalizeTimeInput(data.saturdayShiftEndTime);
   if (data.autoSendMorningReport !== undefined)
     updatePayload.autoSendMorningReport = Boolean(data.autoSendMorningReport);
   if (data.autoSendDailyLog !== undefined)

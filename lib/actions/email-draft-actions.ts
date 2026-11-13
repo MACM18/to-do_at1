@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '../prisma';
-import { getDayBounds, formatTo24HrDot, formatLocalDate, getLocalDateParts } from '../time-utils';
+import { getDayBounds, normalizeTimeInput, formatLocalDate, getLocalDateParts, formatTimesInHtml } from '../time-utils';
 import {
   getTransporter,
   resolveRecipients,
@@ -68,8 +68,8 @@ export async function getEmailDraftPreview(params: {
   const { toList, ccList, bccList } = resolveRecipients(config);
 
   const isSaturday = dayOfWeek === 6;
-  const defaultShiftStart = formatTo24HrDot(config?.shiftStartTime || '08.30');
-  const defaultShiftEnd = isSaturday ? '13.30' : formatTo24HrDot(config?.shiftEndTime || '17.30');
+  const defaultShiftStart = normalizeTimeInput(config?.shiftStartTime || '08:30');
+  const defaultShiftEnd = isSaturday ? '13:30' : normalizeTimeInput(config?.shiftEndTime || '17:30');
 
   // Check if a saved draft exists in database for this user, date and type
   const savedDraft = await prisma.emailDraft.findFirst({
@@ -112,7 +112,7 @@ export async function getEmailDraftPreview(params: {
       toRecipients: savedDraft.toRecipients,
       ccRecipients: savedDraft.ccRecipients || '',
       bccRecipients: savedDraft.bccRecipients || '',
-      bodyHtml: savedDraft.bodyHtml,
+      bodyHtml: formatTimesInHtml(savedDraft.bodyHtml),
       bodyText: savedDraft.bodyText || '',
       checkInTime: savedDraft.checkInTime || defaultShiftStart,
       checkOutTime: savedDraft.checkOutTime || defaultShiftEnd,
@@ -131,15 +131,15 @@ export async function getEmailDraftPreview(params: {
   });
 
   const effectiveCheckIn = customCheckInTime
-    ? formatTo24HrDot(customCheckInTime)
+    ? normalizeTimeInput(customCheckInTime)
     : shift?.shiftStartTime
-    ? formatTo24HrDot(shift.shiftStartTime)
+    ? normalizeTimeInput(shift.shiftStartTime)
     : defaultShiftStart;
 
   const effectiveCheckOut = customCheckOutTime
-    ? formatTo24HrDot(customCheckOutTime)
+    ? normalizeTimeInput(customCheckOutTime)
     : shift?.shiftEndTime
-    ? formatTo24HrDot(shift.shiftEndTime)
+    ? normalizeTimeInput(shift.shiftEndTime)
     : defaultShiftEnd;
 
   const isMorning = type === 'MORNING_PLAN';
@@ -188,7 +188,7 @@ export async function getEmailDraftPreview(params: {
     targetDate: todayStart,
     customShift: {
       shiftStartTime: effectiveCheckIn,
-      prepEndTime: config?.prepEndTime || '08.45',
+      prepEndTime: config?.prepEndTime || '08:45',
       shiftEndTime: effectiveCheckOut,
     },
   });
@@ -251,8 +251,8 @@ export async function saveEmailDraft(data: {
     });
 
     const shiftData = {
-      ...(data.checkInTime ? { shiftStartTime: formatTo24HrDot(data.checkInTime) } : {}),
-      ...(data.checkOutTime ? { shiftEndTime: formatTo24HrDot(data.checkOutTime) } : {}),
+      ...(data.checkInTime ? { shiftStartTime: normalizeTimeInput(data.checkInTime) } : {}),
+      ...(data.checkOutTime ? { shiftEndTime: normalizeTimeInput(data.checkOutTime) } : {}),
     };
 
     if (existingShift) {
@@ -294,10 +294,10 @@ export async function saveEmailDraft(data: {
         toRecipients: data.toRecipients.trim(),
         ccRecipients: data.ccRecipients?.trim() || '',
         bccRecipients: data.bccRecipients?.trim() || '',
-        bodyHtml: data.bodyHtml,
+        bodyHtml: formatTimesInHtml(data.bodyHtml),
         bodyText: data.bodyText || null,
-        checkInTime: data.checkInTime ? formatTo24HrDot(data.checkInTime) : existingDraft.checkInTime,
-        checkOutTime: data.checkOutTime ? formatTo24HrDot(data.checkOutTime) : existingDraft.checkOutTime,
+        checkInTime: data.checkInTime ? normalizeTimeInput(data.checkInTime) : existingDraft.checkInTime,
+        checkOutTime: data.checkOutTime ? normalizeTimeInput(data.checkOutTime) : existingDraft.checkOutTime,
         status: 'DRAFT',
         updatedAt: new Date(),
       },
@@ -313,10 +313,10 @@ export async function saveEmailDraft(data: {
         toRecipients: data.toRecipients.trim(),
         ccRecipients: data.ccRecipients?.trim() || '',
         bccRecipients: data.bccRecipients?.trim() || '',
-        bodyHtml: data.bodyHtml,
+        bodyHtml: formatTimesInHtml(data.bodyHtml),
         bodyText: data.bodyText || null,
-        checkInTime: data.checkInTime ? formatTo24HrDot(data.checkInTime) : null,
-        checkOutTime: data.checkOutTime ? formatTo24HrDot(data.checkOutTime) : null,
+        checkInTime: data.checkInTime ? normalizeTimeInput(data.checkInTime) : null,
+        checkOutTime: data.checkOutTime ? normalizeTimeInput(data.checkOutTime) : null,
         status: 'DRAFT',
       },
     });
@@ -390,10 +390,10 @@ export async function sendEmailDraftNow(data: {
 
     // If Evening Task Log, execute completion logic for daily tasks
     if (data.type === 'EVENING_TASKLOG') {
-      const defaultEnd = isSaturday ? '13.30' : config.shiftEndTime ? formatTo24HrDot(config.shiftEndTime) : '17.30';
-      let finalShiftEnd = data.checkOutTime ? formatTo24HrDot(data.checkOutTime) : defaultEnd;
-      if (isSaturday && (!finalShiftEnd || finalShiftEnd === '17.30' || finalShiftEnd === '5.30')) {
-        finalShiftEnd = '13.30';
+      const defaultEnd = isSaturday ? '13:30' : config.shiftEndTime ? normalizeTimeInput(config.shiftEndTime) : '17:30';
+      let finalShiftEnd = data.checkOutTime ? normalizeTimeInput(data.checkOutTime) : defaultEnd;
+      if (isSaturday && (!finalShiftEnd || finalShiftEnd === '17:30' || finalShiftEnd === '05:30')) {
+        finalShiftEnd = '13:30';
       }
 
       const dailyTasks = await prisma.task.findMany({
@@ -405,8 +405,8 @@ export async function sendEmailDraftNow(data: {
       });
 
       const shiftStartVal = data.checkInTime
-        ? formatTo24HrDot(data.checkInTime)
-        : formatTo24HrDot(config.shiftStartTime || '08.30');
+        ? normalizeTimeInput(data.checkInTime)
+        : normalizeTimeInput(config.shiftStartTime || '08:30');
 
       for (const t of dailyTasks) {
         if (t.subtasks && t.subtasks.length > 0) {
@@ -416,8 +416,8 @@ export async function sendEmailDraftNow(data: {
           });
         }
 
-        let resolvedEndTime = t.endTime ? formatTo24HrDot(t.endTime) : null;
-        if (!resolvedEndTime || (isSaturday && (resolvedEndTime === '17.30' || resolvedEndTime === '5.30'))) {
+        let resolvedEndTime = t.endTime ? normalizeTimeInput(t.endTime) : null;
+        if (!resolvedEndTime || (isSaturday && (resolvedEndTime === '17:30' || resolvedEndTime === '05:30'))) {
           resolvedEndTime = finalShiftEnd;
         }
 
@@ -426,7 +426,7 @@ export async function sendEmailDraftNow(data: {
           data: {
             status: 'DONE',
             progress: 100,
-            startTime: t.startTime ? formatTo24HrDot(t.startTime) : shiftStartVal,
+            startTime: t.startTime ? normalizeTimeInput(t.startTime) : shiftStartVal,
             endTime: resolvedEndTime,
           },
         });
@@ -445,7 +445,7 @@ export async function sendEmailDraftNow(data: {
       from: `"${config.senderName || 'To-Do MACM'}" <${config.smtpUser}>`,
       to: toList.join(', '),
       subject: data.subject.trim(),
-      html: data.bodyHtml,
+      html: formatTimesInHtml(data.bodyHtml),
     };
 
     if (ccList.length > 0) mailOptions.cc = ccList.join(', ');
@@ -485,9 +485,9 @@ export async function sendEmailDraftNow(data: {
         toRecipients: toList.join(', '),
         ccRecipients: ccList.join(', '),
         bccRecipients: bccList.join(', '),
-        bodyHtml: data.bodyHtml,
-        checkInTime: data.checkInTime ? formatTo24HrDot(data.checkInTime) : null,
-        checkOutTime: data.checkOutTime ? formatTo24HrDot(data.checkOutTime) : null,
+        bodyHtml: formatTimesInHtml(data.bodyHtml),
+        checkInTime: data.checkInTime ? normalizeTimeInput(data.checkInTime) : null,
+        checkOutTime: data.checkOutTime ? normalizeTimeInput(data.checkOutTime) : null,
         status: 'SENT',
         sentAt: new Date(),
         messageId: info.messageId,
@@ -501,9 +501,9 @@ export async function sendEmailDraftNow(data: {
         toRecipients: toList.join(', '),
         ccRecipients: ccList.join(', '),
         bccRecipients: bccList.join(', '),
-        bodyHtml: data.bodyHtml,
-        checkInTime: data.checkInTime ? formatTo24HrDot(data.checkInTime) : null,
-        checkOutTime: data.checkOutTime ? formatTo24HrDot(data.checkOutTime) : null,
+        bodyHtml: formatTimesInHtml(data.bodyHtml),
+        checkInTime: data.checkInTime ? normalizeTimeInput(data.checkInTime) : null,
+        checkOutTime: data.checkOutTime ? normalizeTimeInput(data.checkOutTime) : null,
         status: 'SENT',
         sentAt: new Date(),
         messageId: info.messageId,
@@ -532,7 +532,7 @@ export async function sendEmailDraftNow(data: {
       notifyDayPlanSuccess({
         userName: targetUser.name,
         dateStr: formattedLong,
-        checkInTime: data.checkInTime ? formatTo24HrDot(data.checkInTime) : formatTo24HrDot(config?.shiftStartTime || '08.30'),
+        checkInTime: data.checkInTime ? normalizeTimeInput(data.checkInTime) : normalizeTimeInput(config?.shiftStartTime || '08:30'),
         plannedTasksCount: tasksCount,
         meetingsCount: meetingsCount,
         toRecipients: toList.join(', '),
@@ -556,7 +556,7 @@ export async function sendEmailDraftNow(data: {
       notifyTaskLogSuccess({
         userName: targetUser.name,
         dateStr: formattedLong,
-        checkOutTime: data.checkOutTime ? formatTo24HrDot(data.checkOutTime) : formatTo24HrDot(config?.shiftEndTime || '17.30'),
+        checkOutTime: data.checkOutTime ? normalizeTimeInput(data.checkOutTime) : normalizeTimeInput(config?.shiftEndTime || '17:30'),
         totalCount: dailyTasks.length,
         completedCount: completedTasksCount,
         pendingCount: pendingTasksCount,

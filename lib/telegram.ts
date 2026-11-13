@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { formatStoredTime } from './time-utils';
 
 /**
  * Global alert deduplication cache across Next.js re-evaluations
@@ -122,7 +123,7 @@ export async function notifyDayPlanSuccess(details: {
 
     const safeUser = escapeHtml(details.userName || 'Lead');
     const safeDate = escapeHtml(details.dateStr || 'Today');
-    const safeCheckIn = escapeHtml(details.checkInTime || '08.30');
+    const safeCheckIn = escapeHtml(formatStoredTime(details.checkInTime || '08:30'));
     const safeTo = escapeHtml(details.toRecipients || 'Configured Recipients');
     const safeMsgId = details.messageId ? escapeHtml(details.messageId) : null;
     const meetingsText =
@@ -186,7 +187,7 @@ export async function notifyTaskLogSuccess(details: {
 
     const safeUser = escapeHtml(details.userName || 'Lead');
     const safeDate = escapeHtml(details.dateStr || 'Today');
-    const safeCheckOut = escapeHtml(details.checkOutTime || 'Standard Shift End');
+    const safeCheckOut = escapeHtml(details.checkOutTime ? formatStoredTime(details.checkOutTime) : 'Standard Shift End');
     const safeTo = escapeHtml(details.toRecipients || 'Configured Recipients');
     const safeMsgId = details.messageId ? escapeHtml(details.messageId) : null;
 

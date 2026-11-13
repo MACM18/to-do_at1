@@ -111,38 +111,94 @@ export function formatLocalTime(
   return new Intl.DateTimeFormat('en-US', { ...options, timeZone }).format(d);
 }
 
-/**
- * Normalizes any dot time string to clean 24-hour dot format:
- * - "5.30" -> "17.30"
- * - "1.30" -> "13.30"
- * - "8.30" / "08.30" -> "08.30"
- * - "8.45" / "08.45" -> "08.45"
- * - "17.30" -> "17.30"
- * - "13.30" -> "13.30"
- */
-export function formatTo24HrDot(timeStr?: string | null): string {
-  if (!timeStr) return '';
-  const trimmed = timeStr.trim().replace(':', '.');
-  const [hStr, mStr] = trimmed.split('.');
-  let hour = parseInt(hStr, 10);
-  const min = mStr ? mStr.padEnd(2, '0').slice(0, 2) : '00';
-
-  if (isNaN(hour)) return timeStr;
-
-  // Convert 12-hour afternoon times without 24h prefix (1 to 7 -> 13 to 19)
-  if (hour >= 1 && hour <= 7) {
-    hour += 12;
-  }
-
-  return `${String(hour).padStart(2, '0')}.${min}`;
+export interface ParsedTime {
+  hour: number;
+  minute: number;
+  value24: string;
+  display: string;
 }
 
-/**
- * Returns formatted time string in 24-hour dot format like "08.45", "12.58", or "17.30" in Asia/Colombo (+05:30)
- */
-export function getLocalTimeDot(date: Date = new Date(), timeZone: string = APP_TIMEZONE): string {
+/** Parse dot or colon time input, with optional AM/PM. Bare 1-12 values mean AM. */
+export function parseTimeInput(timeStr?: string | null): ParsedTime | null {
+  if (!timeStr || !timeStr.trim()) return null;
+
+  const match = timeStr.trim().match(/^(\d{1,2})[.:](\d{1,2})(?:\s*(am|pm))?$/i);
+  if (!match) return null;
+
+  const inputHour = Number(match[1]);
+  const minute = Number(match[2]);
+  const suffix = match[3]?.toLowerCase();
+  if (!Number.isInteger(minute) || minute < 0 || minute > 59) return null;
+
+  let hour = inputHour;
+  if (suffix) {
+    if (inputHour < 1 || inputHour > 12) return null;
+    hour = inputHour % 12;
+    if (suffix === 'pm') hour += 12;
+  } else if (inputHour < 0 || inputHour > 23) {
+    return null;
+  } else if (inputHour >= 1 && inputHour <= 12) {
+    hour = inputHour % 12;
+  }
+
+  const value24 = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  const displayHour = hour % 12 || 12;
+  const display = `${String(displayHour).padStart(2, '0')}.${String(minute).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`;
+  return { hour, minute, value24, display };
+}
+
+/** Return an empty string for blank input; throw for invalid nonblank input. */
+export function normalizeTimeInput(timeStr?: string | null): string {
+  if (!timeStr || !timeStr.trim()) return '';
+  const parsed = parseTimeInput(timeStr);
+  if (!parsed) {
+    throw new Error(`Enter a valid time, such as 08.30 AM or 13:15. Invalid value: "${timeStr}".`);
+  }
+  return parsed.value24;
+}
+
+/** Format a stored or entered time as the app's standard 12-hour display. */
+export function formatTimeForDisplay(timeStr?: string | null): string {
+  if (!timeStr || !timeStr.trim()) return '';
+  return parseTimeInput(timeStr)?.display || timeStr;
+}
+
+/** Format canonical database HH:mm values as 24-hour data, while accepting legacy dot values. */
+export function formatStoredTime(timeStr?: string | null): string {
+  if (!timeStr || !timeStr.trim()) return '';
+  const canonical = timeStr.trim().match(/^(\d{2}):(\d{2})$/);
+  if (canonical) {
+    const hour = Number(canonical[1]);
+    const minute = Number(canonical[2]);
+    if (hour <= 23 && minute <= 59) {
+      const displayHour = hour % 12 || 12;
+      return `${String(displayHour).padStart(2, '0')}.${String(minute).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`;
+    }
+  }
+  return formatTimeForDisplay(timeStr);
+}
+
+/** Normalize standalone time values in saved email HTML, including older drafts. */
+export function formatTimesInHtml(html: string): string {
+  return html.replace(/>(\s*)(\d{1,2}[.:]\d{1,2}(?:\s*(?:am|pm))?)(\s*)</gi, (_match, before, time, after) =>
+    `>${before}${formatStoredTime(time)}${after}<`,
+  );
+}
+
+/** Compatibility alias for existing callers; returns canonical HH:mm. */
+export function formatTo24HrDot(timeStr?: string | null): string {
+  return normalizeTimeInput(timeStr);
+}
+
+/** Returns current local time in canonical 24-hour HH:mm form. */
+export function getLocalTime24(date: Date = new Date(), timeZone: string = APP_TIMEZONE): string {
   const parts = getLocalDateParts(date, timeZone);
-  return `${String(parts.hour).padStart(2, '0')}.${String(parts.minute).padStart(2, '0')}`;
+  return `${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`;
+}
+
+/** @deprecated Use getLocalTime24. Kept for compatibility with older callers. */
+export function getLocalTimeDot(date: Date = new Date(), timeZone: string = APP_TIMEZONE): string {
+  return getLocalTime24(date, timeZone);
 }
 
 /**

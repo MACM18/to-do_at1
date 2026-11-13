@@ -14,6 +14,8 @@ import {
   Calendar,
 } from 'lucide-react';
 import { createTask } from '@/lib/actions/task-actions';
+import TimeInput from './TimeInput';
+import { formatTimeForDisplay } from '@/lib/time-utils';
 
 interface CompactTaskCreatorProps {
   userId: string;
@@ -36,6 +38,7 @@ export default function CompactTaskCreator({
   const [subtasks, setSubtasks] = useState<string[]>([]);
   const [subtaskInput, setSubtaskInput] = useState('');
   const [isPending, startTransition] = useTransition();
+  const [timeError, setTimeError] = useState('');
 
   const handleAddSubtask = () => {
     if (!subtaskInput.trim()) return;
@@ -52,6 +55,7 @@ export default function CompactTaskCreator({
     if (!title.trim()) return;
 
     startTransition(async () => {
+      try {
       await createTask({
         title: title.trim(),
         description: description.trim() || undefined,
@@ -72,7 +76,11 @@ export default function CompactTaskCreator({
       setEndTime('');
       setSubtasks([]);
       setIsExpanded(false);
+      setTimeError('');
       if (onCreated) onCreated();
+      } catch (error: unknown) {
+        setTimeError(error instanceof Error ? error.message : 'Unable to save task times.');
+      }
     });
   };
 
@@ -186,7 +194,7 @@ export default function CompactTaskCreator({
           {(startTime || endTime) && (
             <span className="inline-flex items-center gap-1 px-2 py-1 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-[11px] font-semibold">
               <Clock className="w-3 h-3" />
-              {startTime || 'Start'} - {endTime || 'End'}
+              {startTime ? formatTimeForDisplay(startTime) : 'Start'} - {endTime ? formatTimeForDisplay(endTime) : 'End'}
             </span>
           )}
 
@@ -212,16 +220,15 @@ export default function CompactTaskCreator({
             </div>
 
             {/* Time Ranges */}
+            {timeError && <p className="col-span-2 text-xs text-rose-600 dark:text-rose-400" role="alert">{timeError}</p>}
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-500 mb-1 flex items-center gap-1">
                   <Clock className="w-3 h-3" /> Start Time (e.g. 8.45)
                 </label>
-                <input
-                  type="text"
+                <TimeInput
                   value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  placeholder="08.45"
+                  onChange={(value) => { setStartTime(value); setTimeError(''); }}
                   className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 focus:outline-none"
                 />
               </div>
@@ -230,11 +237,9 @@ export default function CompactTaskCreator({
                 <label className="block text-[11px] font-semibold text-slate-500 mb-1 flex items-center gap-1">
                   <Clock className="w-3 h-3" /> End Time (e.g. 17.30)
                 </label>
-                <input
-                  type="text"
+                <TimeInput
                   value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  placeholder="17.30"
+                  onChange={(value) => { setEndTime(value); setTimeError(''); }}
                   className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 focus:outline-none"
                 />
               </div>

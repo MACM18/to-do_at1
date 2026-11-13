@@ -2,6 +2,7 @@ import cron, { type ScheduledTask } from 'node-cron';
 import { prisma } from './prisma';
 import { sendDailySummaryReport } from './mailer';
 import { processRecurringTasks } from './recurrence';
+import { normalizeTimeInput } from './time-utils';
 
 const SCHEDULER_TIMEZONE = 'Asia/Colombo'; // UTC+05:30
 
@@ -75,7 +76,7 @@ export async function initScheduler() {
     // Schedule 2: Automated Evening Task Log (Mon-Fri at configured time, Sat at saturdayReportTime)
     if (config.autoSendDailyLog && config.smtpUser && hasRecipients) {
       // 2A: Weekday Evening Log (Monday to Friday, e.g. 17:30 or 18:00)
-      const eveningTime = config.eveningReportTime || '17:30';
+      const eveningTime = normalizeTimeInput(config.eveningReportTime || '17:30');
       const [hourStr, minuteStr] = eveningTime.split(':');
       const minute = parseInt(minuteStr || '30', 10);
       const hour = parseInt(hourStr || '17', 10);
@@ -100,7 +101,7 @@ export async function initScheduler() {
       );
 
       // 2B: Saturday Task Log (Configurable Saturday auto-send, defaults to 13:30)
-      const saturdayTime = config.saturdayReportTime || '13:30';
+      const saturdayTime = normalizeTimeInput(config.saturdayReportTime || '13:30');
       const [satHourStr, satMinuteStr] = saturdayTime.split(':');
       const satMinute = parseInt(satMinuteStr || '30', 10);
       const satHour = parseInt(satHourStr || '13', 10);

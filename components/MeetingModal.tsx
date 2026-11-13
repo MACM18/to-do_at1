@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useTransition } from 'react';
 import { X, Users, Clock, Plus, Trash2, Calendar, FileText } from 'lucide-react';
 import { createMeeting, updateMeeting, deleteMeeting } from '@/lib/actions/meeting-actions';
-import { getLocalTimeDot } from '@/lib/time-utils';
+import { getLocalTime24, formatStoredTime } from '@/lib/time-utils';
+import TimeInput from './TimeInput';
 
 interface MeetingModalProps {
   isOpen: boolean;
@@ -28,18 +29,18 @@ export default function MeetingModal({
   useEffect(() => {
     if (editingMeeting) {
       setTitle(editingMeeting.title || '');
-      setStartTime(editingMeeting.startTime || '');
-      setEndTime(editingMeeting.endTime || '');
+      setStartTime(formatStoredTime(editingMeeting.startTime));
+      setEndTime(formatStoredTime(editingMeeting.endTime));
       setDescription(editingMeeting.description || '');
       setError('');
     } else {
       setTitle('');
-      const current = getLocalTimeDot();
-      setStartTime(current);
+      const current = getLocalTime24();
+      setStartTime(formatStoredTime(current));
       // Default end time 30 mins later
       const now = new Date();
       now.setMinutes(now.getMinutes() + 30);
-      setEndTime(getLocalTimeDot(now));
+      setEndTime(formatStoredTime(getLocalTime24(now)));
       setDescription('');
       setError('');
     }
@@ -151,12 +152,10 @@ export default function MeetingModal({
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5 text-blue-500" /> Start Time *
               </label>
-              <input
-                type="text"
+              <TimeInput
                 required
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                placeholder="e.g. 10.30"
+                onChange={setStartTime}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
               />
             </div>
@@ -165,12 +164,10 @@ export default function MeetingModal({
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5 text-indigo-500" /> End Time *
               </label>
-              <input
-                type="text"
+              <TimeInput
                 required
                 value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                placeholder="e.g. 11.15"
+                onChange={setEndTime}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
               />
             </div>

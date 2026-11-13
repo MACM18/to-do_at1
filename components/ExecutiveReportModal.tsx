@@ -26,6 +26,7 @@ import {
   getSaturdayProgressReportData,
 } from '@/lib/actions/task-actions';
 import { saveReport } from '@/lib/actions/report-actions';
+import { formatStoredTime } from '@/lib/time-utils';
 import {
   generateMondayWorkplanPdf,
   generateSaturdayProgressPdf,
@@ -406,7 +407,7 @@ export default function ExecutiveReportModal({
                               </div>
                               <div className="flex items-center gap-2 text-[10px] text-slate-400">
                                 <span>{t.priority}</span>
-                                {t.startTime && <span>Started: {t.startTime}</span>}
+                                {t.startTime && <span>Started: {formatStoredTime(t.startTime)}</span>}
                               </div>
                             </div>
                           ))}
@@ -590,7 +591,7 @@ export default function ExecutiveReportModal({
                                 {t.title}
                               </span>
                               <span className="text-[10px] font-mono text-slate-400 shrink-0">
-                                {t.startTime || '8.30'} - {t.endTime || 'Done'}
+                                {formatStoredTime(t.startTime || '08:30')} - {t.endTime ? formatStoredTime(t.endTime) : 'Done'}
                               </span>
                             </div>
                           ))}
@@ -640,7 +641,7 @@ export default function ExecutiveReportModal({
                                 {m.title}
                               </span>
                               <span className="text-[10px] font-mono text-sky-700 dark:text-sky-300 shrink-0">
-                                {m.startTime} - {m.endTime}
+                                {formatStoredTime(m.startTime)} - {formatStoredTime(m.endTime)}
                               </span>
                             </div>
                           ))}

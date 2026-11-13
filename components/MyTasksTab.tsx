@@ -32,6 +32,7 @@ import DailyLogModal from "./DailyLogModal";
 import MeetingModal from "./MeetingModal";
 import CompactTaskCreator from "./CompactTaskCreator";
 import EmailPreviewModal from "./EmailPreviewModal";
+import TimeInput from "./TimeInput";
 import {
   triggerMorningReportAction,
   triggerEveningSummaryAction,
@@ -41,8 +42,8 @@ import { saveTodayShift, getTodayShift } from "@/lib/actions/shift-actions";
 import { getTodayEmailDraftStatus } from "@/lib/actions/email-draft-actions";
 import {
   getDayBounds,
-  getLocalTimeDot,
-  formatTo24HrDot,
+  getLocalTime24,
+  formatStoredTime,
 } from "@/lib/time-utils";
 
 interface MyTasksTabProps {
@@ -147,14 +148,14 @@ export default function MyTasksTab({
   );
   const defaultShiftEnd =
     todayDay === 6
-      ? "13.30"
+      ? "13:30"
       : config?.shiftEndTime
-        ? formatTo24HrDot(config.shiftEndTime)
-        : "17.30";
+        ? formatStoredTime(config.shiftEndTime)
+        : "17:30";
 
   // Daily custom check-in & check-out state
   const [checkInTime, setCheckInTime] = useState(
-    formatTo24HrDot(config?.shiftStartTime || "08.30"),
+    formatStoredTime(config?.shiftStartTime || "08:30"),
   );
   const [checkOutTime, setCheckOutTime] = useState(defaultShiftEnd);
   const [isShiftSaved, setIsShiftSaved] = useState(false);
@@ -165,11 +166,11 @@ export default function MyTasksTab({
         const shift = await getTodayShift(currentUser.id);
         if (shift) {
           if (shift.shiftStartTime)
-            setCheckInTime(formatTo24HrDot(shift.shiftStartTime));
+            setCheckInTime(formatStoredTime(shift.shiftStartTime));
           if (shift.shiftEndTime)
-            setCheckOutTime(formatTo24HrDot(shift.shiftEndTime));
+            setCheckOutTime(formatStoredTime(shift.shiftEndTime));
         } else if (todayDay === 6) {
-          setCheckOutTime("13.30");
+          setCheckOutTime("13:30");
         }
         loadDraftStatus();
       }
@@ -246,13 +247,17 @@ export default function MyTasksTab({
   // Save Today's Shift Times
   const handleSaveShiftTimes = () => {
     startTransition(async () => {
-      await saveTodayShift({
-        userId: currentUser.id,
-        shiftStartTime: checkInTime,
-        shiftEndTime: checkOutTime,
-      });
-      setIsShiftSaved(true);
-      setTimeout(() => setIsShiftSaved(false), 2500);
+      try {
+        await saveTodayShift({
+          userId: currentUser.id,
+          shiftStartTime: checkInTime,
+          shiftEndTime: checkOutTime,
+        });
+        setIsShiftSaved(true);
+        setTimeout(() => setIsShiftSaved(false), 2500);
+      } catch (error) {
+        setStatusMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to save shift times.' });
+      }
     });
   };
 
@@ -260,21 +265,12 @@ export default function MyTasksTab({
   const handleSendMorningReport = () => {
     setStatusMessage(null);
     startTransition(async () => {
-      await saveTodayShift({
-        userId: currentUser.id,
-        shiftStartTime: checkInTime,
-        shiftEndTime: checkOutTime,
-      });
-
-      const res = await triggerMorningReportAction(
-        currentUser.id,
-        undefined,
-        checkInTime,
-      );
-      if (res.success) {
-        setStatusMessage({ type: "success", text: res.message });
-      } else {
-        setStatusMessage({ type: "error", text: res.message });
+      try {
+        await saveTodayShift({ userId: currentUser.id, shiftStartTime: checkInTime, shiftEndTime: checkOutTime });
+        const res = await triggerMorningReportAction(currentUser.id, undefined, checkInTime);
+        setStatusMessage({ type: res.success ? "success" : "error", text: res.message });
+      } catch (error) {
+        setStatusMessage({ type: "error", text: error instanceof Error ? error.message : 'Unable to send the Day Plan.' });
       }
       setTimeout(() => setStatusMessage(null), 6000);
     });
@@ -284,21 +280,12 @@ export default function MyTasksTab({
   const handleSendEveningReport = () => {
     setStatusMessage(null);
     startTransition(async () => {
-      await saveTodayShift({
-        userId: currentUser.id,
-        shiftStartTime: checkInTime,
-        shiftEndTime: checkOutTime,
-      });
-
-      const res = await triggerEveningSummaryAction(
-        undefined,
-        currentUser.id,
-        checkOutTime,
-      );
-      if (res.success) {
-        setStatusMessage({ type: "success", text: res.message });
-      } else {
-        setStatusMessage({ type: "error", text: res.message });
+      try {
+        await saveTodayShift({ userId: currentUser.id, shiftStartTime: checkInTime, shiftEndTime: checkOutTime });
+        const res = await triggerEveningSummaryAction(undefined, currentUser.id, checkOutTime);
+        setStatusMessage({ type: res.success ? "success" : "error", text: res.message });
+      } catch (error) {
+        setStatusMessage({ type: "error", text: error instanceof Error ? error.message : 'Unable to send the Task Log.' });
       }
       setTimeout(() => setStatusMessage(null), 6000);
     });
@@ -554,8 +541,8 @@ export default function MyTasksTab({
                     {todayDay === 0
                       ? "Sunday (Off Day)"
                       : todayDay === 6
-                        ? `Saturday (${config?.shiftStartTime || "08.30"} - ${config?.saturdayShiftEndTime || "13.30"})`
-                        : `Mon-Fri (${config?.shiftStartTime || "08.30"} - ${config?.shiftEndTime || "17.30"})`}
+                        ? `Saturday (${formatStoredTime(config?.shiftStartTime || "08:30")} - ${formatStoredTime(config?.saturdayShiftEndTime || "13:30")})`
+                        : `Mon-Fri (${formatStoredTime(config?.shiftStartTime || "08:30")} - ${formatStoredTime(config?.shiftEndTime || "17:30")})`}
                   </span>
                 </div>
               </div>
@@ -571,12 +558,10 @@ export default function MyTasksTab({
                 <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                   Check-in (e.g. 08.30)
                 </label>
-                <input
-                  type="text"
+                <TimeInput
                   value={checkInTime}
-                  onChange={(e) => setCheckInTime(e.target.value)}
+                  onChange={setCheckInTime}
                   onBlur={handleSaveShiftTimes}
-                  placeholder="08.30"
                   className="w-full px-3 py-1.5 text-xs font-mono font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -585,19 +570,16 @@ export default function MyTasksTab({
                 <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                   Check-out (e.g. 17.30)
                 </label>
-                <input
-                  type="text"
+                <TimeInput
                   value={checkOutTime}
-                  onChange={(e) => setCheckOutTime(e.target.value)}
+                  onChange={setCheckOutTime}
                   onBlur={handleSaveShiftTimes}
-                  placeholder="17.30"
                   className="w-full px-3 py-1.5 text-xs font-mono font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
             <p className="text-[10px] text-slate-400">
-              Times are in 24h format and applied directly to morning Day Plan
-              and evening Task Log reports.
+              Enter times in 12 or 24 hour format. Reports display AM/PM times.
             </p>
           </div>
 
@@ -856,7 +838,7 @@ export default function MyTasksTab({
                       </span>
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-sky-100 dark:bg-sky-900/60 text-sky-800 dark:text-sky-300 shrink-0">
                         <Clock className="w-2.5 h-2.5" />
-                        {m.startTime} - {m.endTime}
+                        {formatStoredTime(m.startTime)} - {formatStoredTime(m.endTime)}
                       </span>
                     </div>
                     {m.description && (

@@ -40,7 +40,8 @@ import {
   togglePauseEveningLogForTodayAction,
 } from "@/lib/actions/config-actions";
 import { deleteUser, updateUserPassword } from "@/lib/actions/user-actions";
-import { formatTo24HrDot, getLocalDateParts } from "@/lib/time-utils";
+import { formatStoredTime, getLocalDateParts } from "@/lib/time-utils";
+import TimeInput from "./TimeInput";
 
 interface SettingsTabProps {
   config: any;
@@ -100,27 +101,27 @@ export default function SettingsTab({
     initialConfig?.bccRecipients || "",
   );
 
-  // Automation & Shift State (24-hour format)
+  // Automation and shift times are entered in the same flexible format.
   const [morningReportTime, setMorningReportTime] = useState(
-    initialConfig?.morningReportTime || "08:00",
+    formatStoredTime(initialConfig?.morningReportTime || "08:00"),
   );
   const [eveningReportTime, setEveningReportTime] = useState(
-    initialConfig?.eveningReportTime || "17:30",
+    formatStoredTime(initialConfig?.eveningReportTime || "17:30"),
   );
   const [saturdayReportTime, setSaturdayReportTime] = useState(
-    initialConfig?.saturdayReportTime || "13:30",
+    formatStoredTime(initialConfig?.saturdayReportTime || "13:30"),
   );
   const [shiftStartTime, setShiftStartTime] = useState(
-    formatTo24HrDot(initialConfig?.shiftStartTime || "08.30"),
+    formatStoredTime(initialConfig?.shiftStartTime || "08:30"),
   );
   const [prepEndTime, setPrepEndTime] = useState(
-    formatTo24HrDot(initialConfig?.prepEndTime || "08.45"),
+    formatStoredTime(initialConfig?.prepEndTime || "08:45"),
   );
   const [shiftEndTime, setShiftEndTime] = useState(
-    formatTo24HrDot(initialConfig?.shiftEndTime || "17.30"),
+    formatStoredTime(initialConfig?.shiftEndTime || "17:30"),
   );
   const [saturdayShiftEndTime, setSaturdayShiftEndTime] = useState(
-    formatTo24HrDot(initialConfig?.saturdayShiftEndTime || "13.30"),
+    formatStoredTime(initialConfig?.saturdayShiftEndTime || "13:30"),
   );
   const [autoSendDailyLog, setAutoSendDailyLog] = useState(
     Boolean(initialConfig?.autoSendDailyLog),
@@ -818,10 +819,9 @@ export default function SettingsTab({
                   <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                     Weekday Auto-Send (Mon - Fri)
                   </label>
-                  <input
-                    type="time"
+                  <TimeInput
                     value={eveningReportTime}
-                    onChange={(e) => setEveningReportTime(e.target.value)}
+                    onChange={setEveningReportTime}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -830,10 +830,9 @@ export default function SettingsTab({
                   <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                     Saturday Auto-Send
                   </label>
-                  <input
-                    type="time"
+                  <TimeInput
                     value={saturdayReportTime}
-                    onChange={(e) => setSaturdayReportTime(e.target.value)}
+                    onChange={setSaturdayReportTime}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -922,11 +921,9 @@ export default function SettingsTab({
                   <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                     Shift Start (e.g. 08.30)
                   </label>
-                  <input
-                    type="text"
+                  <TimeInput
                     value={shiftStartTime}
-                    onChange={(e) => setShiftStartTime(e.target.value)}
-                    placeholder="08.30"
+                    onChange={setShiftStartTime}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -935,11 +932,9 @@ export default function SettingsTab({
                   <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                     Plan Prep End (e.g. 08.45)
                   </label>
-                  <input
-                    type="text"
+                  <TimeInput
                     value={prepEndTime}
-                    onChange={(e) => setPrepEndTime(e.target.value)}
-                    placeholder="08.45"
+                    onChange={setPrepEndTime}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -948,11 +943,9 @@ export default function SettingsTab({
                   <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                     Weekday Shift End (e.g. 17.30)
                   </label>
-                  <input
-                    type="text"
+                  <TimeInput
                     value={shiftEndTime}
-                    onChange={(e) => setShiftEndTime(e.target.value)}
-                    placeholder="17.30"
+                    onChange={setShiftEndTime}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -961,11 +954,9 @@ export default function SettingsTab({
                   <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                     Saturday Shift End (e.g. 13.30)
                   </label>
-                  <input
-                    type="text"
+                  <TimeInput
                     value={saturdayShiftEndTime}
-                    onChange={(e) => setSaturdayShiftEndTime(e.target.value)}
-                    placeholder="13.30"
+                    onChange={setSaturdayShiftEndTime}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100"
                   />
                 </div>
